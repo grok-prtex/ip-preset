@@ -3,438 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IpPreset — IPプリセット</title>
-  <meta name="description" content="拠点・設備ごとの IP 設定を、プリセットで切り替える Windows 向けツール。インストール不要。">
-  <link rel="stylesheet" href="colors_and_type.css">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-
-    html {
-      -webkit-text-size-adjust: 100%;
-    }
-
-    body {
-      margin: 0;
-      background: var(--paper);
-      color: var(--ink);
-      font-family: var(--font-sans);
-      font-size: var(--fs-body);
-      font-weight: var(--w-regular);
-      line-height: var(--lh-body);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    a {
-      color: var(--signal-ink);
-      text-decoration-thickness: 1px;
-      text-underline-offset: 0.18em;
-    }
-
-    a:hover {
-      color: var(--signal);
-    }
-
-    a:focus-visible {
-      outline: none;
-      box-shadow: var(--focus-ring);
-      border-radius: var(--r-xs);
-    }
-
-    .wrap {
-      width: min(100% - 2 * var(--sp-6), 820px);
-      margin-inline: auto;
-    }
-
-    /* --- Header --- */
-    .site-header {
-      padding: var(--sp-6) 0 var(--sp-4);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .site-header .wrap {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--sp-4);
-    }
-
-    .brand {
-      font-family: var(--font-mono);
-      font-size: var(--fs-sm);
-      font-weight: var(--w-medium);
-      letter-spacing: var(--tracking-label);
-      text-transform: uppercase;
-      color: var(--ink-2);
-    }
-
-    .brand strong {
-      color: var(--ink);
-      font-weight: var(--w-semibold);
-    }
-
-    .ver {
-      font-family: var(--font-mono);
-      font-size: var(--fs-xs);
-      color: var(--ink-3);
-    }
-
-    /* --- Hero --- */
-    .hero {
-      padding: var(--sp-16) 0 var(--sp-12);
-    }
-
-    .micro {
-      display: inline-block;
-      margin: 0 0 var(--sp-4);
-      padding: var(--sp-1) var(--sp-3);
-      border: 1px solid var(--line-2);
-      border-radius: var(--r-sm);
-      background: var(--surface);
-      font-family: var(--font-mono);
-      font-size: var(--fs-micro);
-      font-weight: var(--w-medium);
-      letter-spacing: var(--tracking-label);
-      text-transform: uppercase;
-      color: var(--ink-2);
-    }
-
-    h1 {
-      margin: 0 0 var(--sp-5);
-      font-size: clamp(1.625rem, 4.2vw, 2.125rem);
-      font-weight: var(--w-semibold);
-      line-height: var(--lh-snug);
-      letter-spacing: var(--tracking-tight);
-      color: var(--ink);
-    }
-
-    .lead {
-      margin: 0 0 var(--sp-8);
-      max-width: 36em;
-      font-size: var(--fs-lg);
-      color: var(--ink-2);
-    }
-
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--sp-4) var(--sp-6);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--sp-2);
-      min-height: 44px;
-      padding: 0 var(--sp-6);
-      border: 1px solid transparent;
-      border-radius: var(--r-md);
-      font-family: var(--font-sans);
-      font-size: var(--fs-body);
-      font-weight: var(--w-medium);
-      line-height: 1;
-      text-decoration: none;
-      cursor: pointer;
-      transition:
-        background-color var(--dur) var(--ease),
-        border-color var(--dur) var(--ease),
-        color var(--dur) var(--ease);
-    }
-
-    .btn:focus-visible {
-      outline: none;
-      box-shadow: var(--focus-ring);
-    }
-
-    .btn-primary {
-      background: var(--signal);
-      border-color: var(--signal);
-      color: #fff;
-    }
-
-    .btn-primary:hover {
-      background: var(--signal-bright);
-      border-color: var(--signal-bright);
-      color: #fff;
-    }
-
-    .btn-primary:active {
-      background: var(--signal-ink);
-      border-color: var(--signal-ink);
-      color: #fff;
-    }
-
-    .link-secondary {
-      font-size: var(--fs-sm);
-      font-weight: var(--w-medium);
-      color: var(--ink-2);
-      text-decoration: none;
-      border-bottom: 1px solid var(--line-2);
-    }
-
-    .link-secondary:hover {
-      color: var(--signal-ink);
-      border-bottom-color: var(--signal-line);
-    }
-
-    /* --- Sections --- */
-    section {
-      padding: var(--sp-10) 0;
-      border-top: 1px solid var(--line);
-    }
-
-    .section-label {
-      margin: 0 0 var(--sp-5);
-      font-family: var(--font-mono);
-      font-size: var(--fs-micro);
-      font-weight: var(--w-medium);
-      letter-spacing: var(--tracking-label);
-      text-transform: uppercase;
-      color: var(--ink-3);
-    }
-
-    h2 {
-      margin: 0 0 var(--sp-6);
-      font-size: var(--fs-h4);
-      font-weight: var(--w-semibold);
-      line-height: var(--lh-snug);
-      color: var(--ink);
-    }
-
-    /* Feature grid */
-    .feature-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--sp-3);
-    }
-
-    @media (max-width: 560px) {
-      .feature-list {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .feature-list li {
-      padding: var(--sp-4) var(--sp-5);
-      border: 1px solid var(--line);
-      border-radius: var(--r-lg);
-      background: var(--surface);
-      font-size: var(--fs-sm);
-      color: var(--ink);
-    }
-
-    .feature-list li span {
-      display: block;
-      margin-bottom: var(--sp-1);
-      font-family: var(--font-mono);
-      font-size: var(--fs-micro);
-      font-weight: var(--w-medium);
-      letter-spacing: var(--tracking-label);
-      text-transform: uppercase;
-      color: var(--signal-ink);
-    }
-
-    /* Steps */
-    .steps {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      counter-reset: step;
-    }
-
-    .steps li {
-      position: relative;
-      display: grid;
-      grid-template-columns: 2rem 1fr;
-      gap: var(--sp-4);
-      padding: var(--sp-4) 0;
-      border-top: 1px solid var(--line);
-      align-items: baseline;
-    }
-
-    .steps li:last-child {
-      border-bottom: 1px solid var(--line);
-    }
-
-    .steps li::before {
-      counter-increment: step;
-      content: counter(step, decimal-leading-zero);
-      font-family: var(--font-mono);
-      font-size: var(--fs-xs);
-      font-weight: var(--w-medium);
-      color: var(--ink-3);
-      letter-spacing: 0.04em;
-    }
-
-    .steps li p {
-      margin: 0;
-      font-size: var(--fs-sm);
-      color: var(--ink);
-    }
-
-    .steps code {
-      font-family: var(--font-mono);
-      font-size: 0.92em;
-      padding: 0.1em 0.35em;
-      border: 1px solid var(--line);
-      border-radius: var(--r-xs);
-      background: var(--paper-2);
-      color: var(--ink);
-    }
-
-    /* Env */
-    .env-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      border: 1px solid var(--line);
-      border-radius: var(--r-lg);
-      background: var(--surface);
-      overflow: hidden;
-    }
-
-    .env-list li {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--sp-4);
-      padding: var(--sp-4) var(--sp-5);
-      font-size: var(--fs-sm);
-      border-top: 1px solid var(--line);
-    }
-
-    .env-list li:first-child {
-      border-top: none;
-    }
-
-    .env-list .k {
-      color: var(--ink-2);
-    }
-
-    .env-list .v {
-      font-family: var(--font-mono);
-      font-size: var(--fs-xs);
-      color: var(--ink);
-      text-align: right;
-    }
-
-    /* Note */
-    .note {
-      margin: var(--sp-8) 0 0;
-      padding: var(--sp-4) var(--sp-5);
-      border: 1px solid var(--warn-line);
-      border-radius: var(--r-md);
-      background: var(--warn-wash);
-      font-size: var(--fs-sm);
-      color: var(--ink);
-    }
-
-    .note strong {
-      font-weight: var(--w-medium);
-      color: var(--warn);
-    }
-
-    /* Footer */
-    .site-footer {
-      padding: var(--sp-8) 0 var(--sp-12);
-      border-top: 1px solid var(--line);
-    }
-
-    .site-footer p {
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: var(--fs-xs);
-      color: var(--ink-3);
-      letter-spacing: 0.02em;
-    }
-
-    .site-footer a {
-      color: var(--ink-3);
-      text-decoration: none;
-    }
-
-    .site-footer a:hover {
-      color: var(--ink-2);
-    }
-  </style>
+  <title>IPプリセット — Grok Prtex</title>
+  <meta name="description" content="拠点・設備ごとにIP設定を切り替える Windows ツール。zip を展開して使います。">
+  <meta name="theme-color" content="#0B0C0E">
+  <link rel="stylesheet" href="site.css">
 </head>
 <body>
   <header class="site-header">
     <div class="wrap">
-      <div class="brand"><strong>IpPreset</strong> · a-ef</div>
+      <div class="brand">Grok Prtex · <strong>IPプリセット</strong></div>
       <div class="ver">v0.1.0</div>
     </div>
   </header>
 
   <main>
-    <div class="wrap hero">
-      <p class="micro">IP-201 · IPプリセット</p>
-      <h1>拠点・設備ごとの IP 設定を、プリセットで切り替える</h1>
-      <p class="lead">アダプタを選んで適用するだけの Windows 向けツール。インストール不要、zip を展開して実行します。</p>
+    <div class="wrap">
+      <h1>IPプリセット</h1>
+      <p class="lead">拠点・設備ごとに IP 設定を切り替える Windows ツールです。zip を展開して使います。</p>
+
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows用をダウンロード</a>
-        <a class="link-secondary" href="https://github.com/grok-prtex/ip-preset">ソース・手順（GitHub）</a>
+        <a class="btn" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows用 zip をダウンロード</a>
+        <a class="link-quiet" href="https://github.com/grok-prtex/ip-preset">GitHub</a>
       </div>
-    </div>
 
-    <section aria-labelledby="features-heading">
-      <div class="wrap">
-        <p class="section-label">Features</p>
-        <h2 id="features-heading">できること</h2>
-        <ul class="feature-list">
-          <li><span>01</span>プリセット保存</li>
-          <li><span>02</span>アダプタ選択</li>
-          <li><span>03</span>DHCP・固定IP</li>
-          <li><span>04</span>UACで適用</li>
-        </ul>
-      </div>
-    </section>
-
-    <section aria-labelledby="howto-heading">
-      <div class="wrap">
-        <p class="section-label">Usage</p>
-        <h2 id="howto-heading">使い方</h2>
-        <ol class="steps">
-          <li><p>配布 zip を展開します。</p></li>
-          <li><p><code>setup.cmd</code> または exe を実行します。</p></li>
-          <li><p>拠点・設備向けのプリセットを作成します。</p></li>
-          <li><p>アダプタを選んで適用します。</p></li>
+      <div class="block">
+        <h2>使い方</h2>
+        <ol class="howto">
+          <li>配布 zip を展開します。</li>
+          <li><code>IpPreset.exe</code> または <code>setup.cmd</code> を実行します。</li>
+          <li>プリセットを作成または選びます。</li>
+          <li>アダプタを選んで適用します。</li>
         </ol>
-        <p class="note"><strong>注意</strong> — 適用時にネットワークが一瞬切れることがあります。</p>
+        <p class="note">適用時に、ネットワークが一瞬切れることがあります。</p>
       </div>
-    </section>
 
-    <section aria-labelledby="env-heading">
-      <div class="wrap">
-        <p class="section-label">Requirements</p>
-        <h2 id="env-heading">動作環境</h2>
-        <ul class="env-list">
+      <div class="block">
+        <h2>動作環境</h2>
+        <ul class="env">
           <li>
             <span class="k">OS</span>
             <span class="v">Windows 10 / 11 x64</span>
           </li>
           <li>
             <span class="k">権限</span>
-            <span class="v">管理者権限（UAC）</span>
-          </li>
-          <li>
-            <span class="k">配布形態</span>
-            <span class="v">zip · インストール不要</span>
+            <span class="v">管理者権限</span>
           </li>
         </ul>
       </div>
-    </section>
+    </div>
   </main>
 
   <footer class="site-footer">
     <div class="wrap">
-      <p>a-ef · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.1.0</p>
+      <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.1.0</p>
     </div>
   </footer>
 </body>
