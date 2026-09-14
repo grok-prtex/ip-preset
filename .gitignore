@@ -1,0 +1,39 @@
+# ビルド成果物
+[Bb]in/
+[Oo]bj/
+dist/
+out/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+*.iml
+
+# publish 関連
+*.pubxml
+*.pubxml.user
+publish/
+
+# テスト結果
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+# OS固有
+.DS_Store
+Thumbs.db
+
+# ローカル設定・秘密情報（誤って含めないよう明示的に除外）
+*.local.json
+appsettings.local.json

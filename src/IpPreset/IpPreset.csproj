@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>IpPreset</RootNamespace>
+    <AssemblyName>IpPreset</AssemblyName>
+
+    <!-- Linux/macOS 上のSDKでも net8.0-windows をビルドできるようにする（実行はWindowsのみ想定） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- アプリ情報 -->
+    <AssemblyTitle>IPプリセット</AssemblyTitle>
+    <Product>IPプリセット</Product>
+    <Company>IpPreset</Company>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Copyright>Copyright</Copyright>
+    <NeutralLanguage>ja</NeutralLanguage>
+
+    <!-- 管理者権限を要求するマニフェスト（NIC設定変更には管理者権限が必須のため） -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Windows専用ツールのため、単一ファイル発行時の余計な言語サテライトを絞る -->
+    <SatelliteResourceLanguages>ja</SatelliteResourceLanguages>
+
+    <!-- publish.ps1 / publish.cmd から win-x64 向け自己完結・単一ファイルで発行します -->
+    <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IpPreset.Core\IpPreset.Core.csproj" />
+  </ItemGroup>
+
+</Project>
