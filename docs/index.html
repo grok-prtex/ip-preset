@@ -3,49 +3,48 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IPプリセット — ぐろっく</title>
-  <meta name="description" content="拠点のIPをプリセットで切り替える。Windows用、zip展開だけ。">
+  <title>IPプリセット</title>
+  <meta name="description" content="拠点・設備の IP 設定をプリセットで切り替える Windows ツール。">
   <meta name="theme-color" content="#0B0C0E">
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
-  <div class="rail" aria-hidden="true"></div>
-
-  <div class="shell">
-    <p class="who">ぐろっく <span>/</span> Grok Prtex</p>
-
-    <p class="prompt" aria-hidden="true"><span class="caret">›</span> open ip-preset</p>
+  <main>
+    <header>
+      <p class="mark">ぐろっく</p>
+      <p class="ver">v0.1.0</p>
+    </header>
 
     <h1>IPプリセット</h1>
-    <p class="tag">現場PCの IP を、名前付きで切り替える。</p>
-
-    <p class="blurb">
-      設備調整や別拠点で、アダプタの固定IP／DHCPを何度も触るのが面倒なので作りました。
-      インストールなし。zip を展開して exe を叩くだけです。
+    <p class="lead">
+      設備調整や別拠点で、アダプタの IP を何度も変えるための小さな Windows アプリです。
+      プリセットを選んで適用するだけ。インストールは不要です。
     </p>
 
-    <div class="actions">
-      <a class="dl" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">zip を取る <span class="meta">v0.1.0 · win-x64</span></a>
-      <a class="src" href="https://github.com/grok-prtex/ip-preset">ソース</a>
-    </div>
+    <p class="cta">
+      <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows 用をダウンロード</a>
+      <a class="textlink" href="https://github.com/grok-prtex/ip-preset">GitHub</a>
+    </p>
 
-    <pre class="run" tabindex="0"><code>1  zip を展開
-2  IpPreset.exe  （または setup.cmd）
-3  プリセットを作る／選ぶ
-4  アダプタを選んで適用</code></pre>
+    <section>
+      <h2>使い方</h2>
+      <ol>
+        <li>zip を展開する</li>
+        <li><code>IpPreset.exe</code> か <code>setup.cmd</code> を実行する</li>
+        <li>プリセットを作るか選ぶ</li>
+        <li>アダプタを選んで適用する</li>
+      </ol>
+      <p class="note">適用のあいだ、ネットワークが短く切れます。</p>
+    </section>
 
-    <p class="warn">適用の瞬間、通信が一度切れます。驚かないでください。</p>
+    <section>
+      <h2>動作環境</h2>
+      <p class="env">Windows 10 / 11（x64） · 管理者権限</p>
+    </section>
+  </main>
 
-    <dl class="spec">
-      <div><dt>OS</dt><dd>Windows 10 / 11 · x64</dd></div>
-      <div><dt>権限</dt><dd>管理者（UAC）</dd></div>
-    </dl>
-
-    <footer>
-      <span>ぐろっくが配ってるやつ</span>
-      <span class="sep">·</span>
-      <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a>
-    </footer>
-  </div>
+  <footer>
+    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a></p>
+  </footer>
 </body>
 </html>
