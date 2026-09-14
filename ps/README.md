@@ -27,6 +27,23 @@ IP 設定の変更時だけ UAC（管理者承認）が出ます。
 
 設定は同じフォルダの `presets.json` に保存されます。サンプルは `presets.example.json` です。
 
+## コマンドライン（CLI）
+
+`IpPreset.cmd` に引数を渡すと、GUI を開かずに操作できます。
+
+```bat
+rem プリセット一覧（名前とモード）を表示して終了
+IpPreset.cmd -ListPresets
+
+rem プリセット名で適用（アダプター選択ダイアログ → UAC）
+IpPreset.cmd -Preset "工場A"
+IpPreset.cmd -Preset "自動" 
+```
+
+- `-Preset` は名前の完全一致（大文字小文字無視）、なければ一意な前方一致で解決します。
+- 適用先アダプターはダイアログで選びます（一覧は `[1] 名前  [状態]` 形式。GUI のコンボも同様）。
+- `-ListPresets` はコンソール出力のみ（GUI なし）。
+
 ## 要件
 
 - Windows 10 / 11

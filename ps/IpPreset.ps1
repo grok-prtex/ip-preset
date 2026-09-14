@@ -20,7 +20,9 @@ param(
     [int]$PrefixLength = -1,
     [string]$Gateway = '',
     [string]$Dns = '',
-    [string]$ResultFile = ''
+    [string]$ResultFile = '',
+    [string]$Preset = '',
+    [switch]$ListPresets
 )
 
 $ErrorActionPreference = 'Stop'
@@ -116,8 +118,22 @@ if ($ApplyOnly) {
 # GUI requires STA
 # ---------------------------------------------------------------------------
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
-    $argsList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', $MyInvocation.MyCommand.Path) + $args
-    Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -Wait
+    # $args drops named parameters; rebuild from $PSBoundParameters so -Preset etc. survive
+    $relaunch = New-Object System.Collections.Generic.List[string]
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', $MyInvocation.MyCommand.Path)) {
+        [void]$relaunch.Add($a)
+    }
+    foreach ($key in $PSBoundParameters.Keys) {
+        $val = $PSBoundParameters[$key]
+        if ($val -is [System.Management.Automation.SwitchParameter]) {
+            if ($val) { [void]$relaunch.Add("-$key") }
+        }
+        else {
+            [void]$relaunch.Add("-$key")
+            [void]$relaunch.Add([string]$val)
+        }
+    }
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $relaunch.ToArray() -Wait
     exit $LASTEXITCODE
 }
 
@@ -600,6 +616,208 @@ function Show-PresetEditDialog {
     return $script:EditResult
 }
 
+function Show-AdapterPickDialog {
+    param(
+        [Parameter(Mandatory)][object[]]$Adapters,
+        [string]$PresetName = ''
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = 'どのアダプターに適用しますか？'
+    $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $dlg.ClientSize = New-Object System.Drawing.Size(480, 360)
+    $dlg.Font = Get-AppFont
+    $dlg.ShowInTaskbar = $true
+
+    $info = New-Object System.Windows.Forms.Label
+    $info.Dock = [System.Windows.Forms.DockStyle]::Top
+    $info.Height = 48
+    $info.Padding = New-Object System.Windows.Forms.Padding(12, 12, 12, 4)
+    $info.Text = if ($PresetName) {
+        "プリセット「$PresetName」を適用するアダプターを選んでください。"
+    }
+    else {
+        '適用するアダプターを選んでください。'
+    }
+
+    $list = New-Object System.Windows.Forms.ListBox
+    $list.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $list.IntegralHeight = $false
+    $list.Font = Get-AppFont -Size 10
+    for ($i = 0; $i -lt $Adapters.Count; $i++) {
+        $a = $Adapters[$i]
+        [void]$list.Items.Add("[$($i + 1)] $($a.Name)  [$($a.Status)]")
+    }
+    if ($list.Items.Count -gt 0) { $list.SelectedIndex = 0 }
+
+    $btnPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+    $btnPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+    $btnPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(12)
+    $btnPanel.Height = 56
+    $applyBtn = New-Object System.Windows.Forms.Button
+    $applyBtn.Text = '適用'
+    $applyBtn.Width = 100
+    $applyBtn.Height = 32
+    $cancelBtn = New-Object System.Windows.Forms.Button
+    $cancelBtn.Text = 'キャンセル'
+    $cancelBtn.Width = 100
+    $cancelBtn.Height = 32
+    $cancelBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    [void]$btnPanel.Controls.Add($cancelBtn)
+    [void]$btnPanel.Controls.Add($applyBtn)
+
+    $script:AdapterPickResult = $null
+    $applyBtn.Add_Click({
+        if ($list.SelectedIndex -lt 0) { return }
+        $script:AdapterPickResult = $Adapters[$list.SelectedIndex]
+        $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $dlg.Close()
+    }.GetNewClosure())
+
+    $list.Add_DoubleClick({
+        if ($list.SelectedIndex -lt 0) { return }
+        $script:AdapterPickResult = $Adapters[$list.SelectedIndex]
+        $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $dlg.Close()
+    }.GetNewClosure())
+
+    $dlg.AcceptButton = $applyBtn
+    $dlg.CancelButton = $cancelBtn
+    $dlg.Controls.Add($list)
+    $dlg.Controls.Add($btnPanel)
+    $dlg.Controls.Add($info)
+
+    $null = $dlg.ShowDialog()
+    if ($dlg.DialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $script:AdapterPickResult
+    }
+    return $null
+}
+
+# ---------------------------------------------------------------------------
+# CLI: -ListPresets / -Preset (before main GUI)
+# ---------------------------------------------------------------------------
+if ($ListPresets) {
+    try {
+        $listPresets = @(Read-Presets)
+    }
+    catch {
+        Write-Error "presets.json の読み込みに失敗しました: $($_.Exception.Message)"
+        exit 1
+    }
+    foreach ($p in $listPresets) {
+        $modeTag = if (([string]$p.mode).ToLowerInvariant() -eq 'static') { '静的' } else { 'DHCP' }
+        Write-Output ("{0}  ({1})" -f [string]$p.name, $modeTag)
+    }
+    exit 0
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Preset)) {
+    try {
+        $allPresets = @(Read-Presets)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "presets.json の読み込みに失敗しました: $($_.Exception.Message)",
+            'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+
+    $want = $Preset.Trim()
+    $exact = @($allPresets | Where-Object { [string]$_.name -ieq $want })
+    $chosen = $null
+    if ($exact.Count -eq 1) {
+        $chosen = $exact[0]
+    }
+    elseif ($exact.Count -gt 1) {
+        $msg = "プリセット名が重複しています: $want"
+        Write-Error $msg
+        [System.Windows.Forms.MessageBox]::Show($msg, 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+    else {
+        $prefix = @($allPresets | Where-Object {
+                ([string]$_.name).StartsWith($want, [System.StringComparison]::OrdinalIgnoreCase)
+            })
+        if ($prefix.Count -eq 1) {
+            $chosen = $prefix[0]
+        }
+        elseif ($prefix.Count -eq 0) {
+            $msg = "プリセットが見つかりません: $want"
+            Write-Error $msg
+            [System.Windows.Forms.MessageBox]::Show($msg, 'IPプリセット',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            exit 1
+        }
+        else {
+            $names = ($prefix | ForEach-Object { [string]$_.name }) -join ', '
+            $msg = "プリセット名が曖昧です（複数一致）: $want`r`n候補: $names"
+            Write-Error $msg
+            [System.Windows.Forms.MessageBox]::Show($msg, 'IPプリセット',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            exit 1
+        }
+    }
+
+    $errs = Test-PresetValid $chosen
+    if ($errs.Count -gt 0) {
+        $msg = ($errs -join "`r`n")
+        Write-Error $msg
+        [System.Windows.Forms.MessageBox]::Show($msg, '入力エラー',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+
+    try {
+        $adapters = @(Get-AdapterList)
+    }
+    catch {
+        $adapters = @()
+    }
+    if ($adapters.Count -eq 0) {
+        $msg = 'ネットワークアダプターが見つかりませんでした。'
+        Write-Error $msg
+        [System.Windows.Forms.MessageBox]::Show($msg, 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+
+    $adapter = Show-AdapterPickDialog -Adapters $adapters -PresetName ([string]$chosen.name)
+    if (-not $adapter) {
+        exit 0
+    }
+
+    try {
+        [void](Invoke-ApplyPreset -IfIndex ([int]$adapter.ifIndex) -Preset $chosen)
+        [System.Windows.Forms.MessageBox]::Show(
+            "プリセット「$([string]$chosen.name)」を「$($adapter.Name)」に適用しました。",
+            'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        exit 0
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            $_.Exception.Message,
+            '適用エラー',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        exit 1
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Main form
 # ---------------------------------------------------------------------------
@@ -814,8 +1032,9 @@ function Refresh-AdapterList {
         Append-Log "アダプター一覧の取得に失敗しました: $($_.Exception.Message)" -IsError
     }
     $adapterCombo.Items.Clear()
-    foreach ($a in $script:Adapters) {
-        [void]$adapterCombo.Items.Add("$($a.Name)  [$($a.Status)]")
+    for ($i = 0; $i -lt $script:Adapters.Count; $i++) {
+        $a = $script:Adapters[$i]
+        [void]$adapterCombo.Items.Add("[$($i + 1)] $($a.Name)  [$($a.Status)]")
     }
     if ($script:Adapters.Count -eq 0) {
         Append-Log 'ネットワークアダプターが見つかりませんでした。' -IsError
