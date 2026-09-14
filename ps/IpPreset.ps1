@@ -184,6 +184,12 @@ Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 $script:AccentColor = [System.Drawing.ColorTranslator]::FromHtml('#FF6B2C')
 $script:ErrorColor = [System.Drawing.ColorTranslator]::FromHtml('#B3261E')
+# Subtle panel tones (status / presets / log) — not flashy
+$script:StatusPanelBg = [System.Drawing.Color]::FromArgb(245, 246, 248)
+$script:PresetPanelBg = [System.Drawing.SystemColors]::Window
+$script:LogPanelBg = [System.Drawing.Color]::FromArgb(250, 250, 251)
+$script:MutedText = [System.Drawing.SystemColors]::GrayText
+$script:Hairline = [System.Drawing.Color]::FromArgb(220, 222, 226)
 
 
 function Get-AppFont {
@@ -481,16 +487,17 @@ function Show-PresetEditDialog {
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
     $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
-    $dlg.ClientSize = New-Object System.Drawing.Size(440, 520)
+    $dlg.ClientSize = New-Object System.Drawing.Size(460, 560)
     $dlg.Font = Get-AppFont
     $dlg.ShowInTaskbar = $false
+    $dlg.Padding = New-Object System.Windows.Forms.Padding(0)
 
     $layout = New-Object System.Windows.Forms.TableLayoutPanel
     $layout.Dock = [System.Windows.Forms.DockStyle]::Fill
     $layout.AutoScroll = $true
     $layout.ColumnCount = 2
-    $layout.Padding = New-Object System.Windows.Forms.Padding(16)
-    [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+    $layout.Padding = New-Object System.Windows.Forms.Padding(20, 16, 20, 8)
+    [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 128)))
     [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 
     $nameBox = New-Object System.Windows.Forms.TextBox
@@ -514,24 +521,27 @@ function Show-PresetEditDialog {
     $errorLabel = New-Object System.Windows.Forms.Label
     $errorLabel.ForeColor = $script:ErrorColor
     $errorLabel.AutoSize = $true
-    $errorLabel.MaximumSize = New-Object System.Drawing.Size(280, 0)
+    $errorLabel.MaximumSize = New-Object System.Drawing.Size(290, 0)
+    $errorLabel.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 4)
 
     function Add-LabeledRow([string]$labelText, [System.Windows.Forms.Control]$control, [string]$hint = $null) {
         $lbl = New-Object System.Windows.Forms.Label
         $lbl.Text = $labelText
         $lbl.AutoSize = $true
         $lbl.Anchor = [System.Windows.Forms.AnchorStyles]::Left
-        $lbl.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+        $lbl.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+        $lbl.Margin = New-Object System.Windows.Forms.Padding(0, 10, 10, 0)
         [void]$layout.Controls.Add($lbl)
-        $control.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 4)
+        $control.Margin = New-Object System.Windows.Forms.Padding(0, 6, 0, 2)
+        $control.Height = 26
         [void]$layout.Controls.Add($control)
         if ($hint) {
             $hintLbl = New-Object System.Windows.Forms.Label
             $hintLbl.Text = $hint
             $hintLbl.AutoSize = $true
-            $hintLbl.ForeColor = [System.Drawing.SystemColors]::GrayText
+            $hintLbl.ForeColor = $script:MutedText
             $hintLbl.Font = Get-AppFont -Size 8
-            $hintLbl.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
+            $hintLbl.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
             [void]$layout.Controls.Add((New-Object System.Windows.Forms.Label))
             [void]$layout.Controls.Add($hintLbl)
         }
@@ -540,15 +550,18 @@ function Show-PresetEditDialog {
     Add-LabeledRow 'プリセット名:' $nameBox
     $modePanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $modePanel.AutoSize = $true
+    $modePanel.WrapContents = $false
     $modePanel.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
-    $dhcpRadio.Margin = New-Object System.Windows.Forms.Padding(0, 4, 16, 4)
+    $modePanel.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 8)
+    $dhcpRadio.Margin = New-Object System.Windows.Forms.Padding(0, 4, 20, 4)
     $staticRadio.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 4)
     [void]$modePanel.Controls.Add($dhcpRadio)
     [void]$modePanel.Controls.Add($staticRadio)
     $modeLbl = New-Object System.Windows.Forms.Label
     $modeLbl.Text = 'モード:'
     $modeLbl.AutoSize = $true
-    $modeLbl.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+    $modeLbl.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $modeLbl.Margin = New-Object System.Windows.Forms.Padding(0, 10, 10, 0)
     [void]$layout.Controls.Add($modeLbl)
     [void]$layout.Controls.Add($modePanel)
 
@@ -596,15 +609,16 @@ function Show-PresetEditDialog {
     $btnPanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $btnPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
     $btnPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
-    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(16)
-    $btnPanel.Height = 56
+    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(20, 10, 20, 14)
+    $btnPanel.Height = 60
     $okBtn = New-Object System.Windows.Forms.Button
     $okBtn.Text = 'OK'
-    $okBtn.Width = 90
+    $okBtn.Width = 96
     $okBtn.Height = 32
+    $okBtn.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
     $cancelBtn = New-Object System.Windows.Forms.Button
     $cancelBtn.Text = 'キャンセル'
-    $cancelBtn.Width = 90
+    $cancelBtn.Width = 96
     $cancelBtn.Height = 32
     $cancelBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     [void]$btnPanel.Controls.Add($cancelBtn)
@@ -671,14 +685,16 @@ function Show-AdapterPickDialog {
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
     $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-    $dlg.ClientSize = New-Object System.Drawing.Size(480, 360)
+    $dlg.ClientSize = New-Object System.Drawing.Size(500, 390)
     $dlg.Font = Get-AppFont
     $dlg.ShowInTaskbar = $true
 
     $info = New-Object System.Windows.Forms.Label
     $info.Dock = [System.Windows.Forms.DockStyle]::Top
-    $info.Height = 48
-    $info.Padding = New-Object System.Windows.Forms.Padding(12, 12, 12, 4)
+    $info.AutoSize = $false
+    $info.Height = 56
+    $info.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 8)
+    $info.Font = Get-AppFont -Size 10
     $info.Text = if ($PresetName) {
         "プリセット「$PresetName」を適用するアダプターを選んでください。"
     }
@@ -686,29 +702,43 @@ function Show-AdapterPickDialog {
         '適用するアダプターを選んでください。'
     }
 
+    $listHost = New-Object System.Windows.Forms.Panel
+    $listHost.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $listHost.Padding = New-Object System.Windows.Forms.Padding(16, 4, 16, 4)
+    $listHost.BackColor = $script:PresetPanelBg
+
     $list = New-Object System.Windows.Forms.ListBox
     $list.Dock = [System.Windows.Forms.DockStyle]::Fill
     $list.IntegralHeight = $false
     $list.Font = Get-AppFont -Size 10
+    $list.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
     for ($i = 0; $i -lt $Adapters.Count; $i++) {
         $a = $Adapters[$i]
         [void]$list.Items.Add("[$($i + 1)] $($a.Name)  [$($a.Status)]")
     }
     if ($list.Items.Count -gt 0) { $list.SelectedIndex = 0 }
+    $listHost.Controls.Add($list)
 
     $btnPanel = New-Object System.Windows.Forms.FlowLayoutPanel
     $btnPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
     $btnPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
-    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(12)
-    $btnPanel.Height = 56
+    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(16, 10, 16, 14)
+    $btnPanel.Height = 60
     $applyBtn = New-Object System.Windows.Forms.Button
     $applyBtn.Text = '適用'
-    $applyBtn.Width = 100
-    $applyBtn.Height = 32
+    $applyBtn.Width = 104
+    $applyBtn.Height = 34
+    $applyBtn.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+    $applyBtn.BackColor = $script:AccentColor
+    $applyBtn.ForeColor = [System.Drawing.Color]::White
+    $applyBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $applyBtn.FlatAppearance.BorderSize = 0
+    $applyBtn.Font = Get-AppFont -Size 10 -Style Bold
+    $applyBtn.UseVisualStyleBackColor = $false
     $cancelBtn = New-Object System.Windows.Forms.Button
     $cancelBtn.Text = 'キャンセル'
-    $cancelBtn.Width = 100
-    $cancelBtn.Height = 32
+    $cancelBtn.Width = 104
+    $cancelBtn.Height = 34
     $cancelBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     [void]$btnPanel.Controls.Add($cancelBtn)
     [void]$btnPanel.Controls.Add($applyBtn)
@@ -733,7 +763,7 @@ function Show-AdapterPickDialog {
     # Dock Bottom/Top before Fill — Fill added first would cover the buttons
     $dlg.Controls.Add($btnPanel)
     $dlg.Controls.Add($info)
-    $dlg.Controls.Add($list)
+    $dlg.Controls.Add($listHost)
 
     $null = $dlg.ShowDialog()
     if ($dlg.DialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -870,27 +900,50 @@ $script:Adapters = @()
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'IPプリセット'
-$form.ClientSize = New-Object System.Drawing.Size(780, 760)
-$form.MinimumSize = New-Object System.Drawing.Size(700, 680)
+$form.ClientSize = New-Object System.Drawing.Size(800, 780)
+$form.MinimumSize = New-Object System.Drawing.Size(720, 700)
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.Font = Get-AppFont
+$form.BackColor = [System.Drawing.SystemColors]::Control
 
 $root = New-Object System.Windows.Forms.TableLayoutPanel
 $root.Dock = [System.Windows.Forms.DockStyle]::Fill
 $root.ColumnCount = 1
-$root.RowCount = 4
-$root.Padding = New-Object System.Windows.Forms.Padding(12)
+$root.RowCount = 5
+$root.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 14)
 [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 240)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 250)))
 [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 170)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 168)))
+
+# Title (slightly stronger hierarchy, no chrome)
+$titleLabel = New-Object System.Windows.Forms.Label
+$titleLabel.Text = 'IPプリセット'
+$titleLabel.AutoSize = $true
+$titleLabel.Font = Get-AppFont -Size 14 -Style Bold
+$titleLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 2)
+$titleHint = New-Object System.Windows.Forms.Label
+$titleHint.Text = 'ネットワークアダプターの IPv4 設定をプリセットで切り替え'
+$titleHint.AutoSize = $true
+$titleHint.ForeColor = $script:MutedText
+$titleHint.Font = Get-AppFont -Size 8.5
+$titleHint.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+$titleBlock = New-Object System.Windows.Forms.FlowLayoutPanel
+$titleBlock.Dock = [System.Windows.Forms.DockStyle]::Fill
+$titleBlock.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
+$titleBlock.WrapContents = $false
+$titleBlock.AutoSize = $true
+$titleBlock.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
+[void]$titleBlock.Controls.Add($titleLabel)
+[void]$titleBlock.Controls.Add($titleHint)
 
 # Adapter row
 $adapterRow = New-Object System.Windows.Forms.TableLayoutPanel
 $adapterRow.Dock = [System.Windows.Forms.DockStyle]::Top
 $adapterRow.AutoSize = $true
 $adapterRow.ColumnCount = 3
-$adapterRow.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+$adapterRow.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
 [void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
 [void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 [void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
@@ -898,7 +951,7 @@ $adapterRow.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
 $adapterLabel = New-Object System.Windows.Forms.Label
 $adapterLabel.Text = 'ネットワークアダプター:'
 $adapterLabel.AutoSize = $true
-$adapterLabel.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+$adapterLabel.Margin = New-Object System.Windows.Forms.Padding(0, 8, 10, 0)
 
 $adapterCombo = New-Object System.Windows.Forms.ComboBox
 $adapterCombo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
@@ -909,6 +962,7 @@ $refreshAdapterBtn = New-Object System.Windows.Forms.Button
 $refreshAdapterBtn.Text = '更新'
 $refreshAdapterBtn.AutoSize = $true
 $refreshAdapterBtn.Margin = New-Object System.Windows.Forms.Padding(0, 3, 0, 0)
+$refreshAdapterBtn.MinimumSize = New-Object System.Drawing.Size(72, 28)
 
 [void]$adapterRow.Controls.Add($adapterLabel, 0, 0)
 [void]$adapterRow.Controls.Add($adapterCombo, 1, 0)
@@ -918,35 +972,41 @@ $refreshAdapterBtn.Margin = New-Object System.Windows.Forms.Padding(0, 3, 0, 0)
 $statusGroup = New-Object System.Windows.Forms.GroupBox
 $statusGroup.Text = '現在の状態'
 $statusGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
-$statusGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+$statusGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
+$statusGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$statusGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 
 $statusInner = New-Object System.Windows.Forms.TableLayoutPanel
 $statusInner.Dock = [System.Windows.Forms.DockStyle]::Fill
 $statusInner.ColumnCount = 1
 $statusInner.RowCount = 2
-$statusInner.Padding = New-Object System.Windows.Forms.Padding(8)
+$statusInner.Padding = New-Object System.Windows.Forms.Padding(4, 6, 4, 2)
+$statusInner.Font = Get-AppFont
 [void]$statusInner.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 [void]$statusInner.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 
 $currentConfigText = New-Object System.Windows.Forms.TextBox
 $currentConfigText.Multiline = $true
 $currentConfigText.ReadOnly = $true
-$currentConfigText.BorderStyle = [System.Windows.Forms.BorderStyle]::None
-$currentConfigText.BackColor = [System.Drawing.SystemColors]::Control
+$currentConfigText.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$currentConfigText.BackColor = $script:StatusPanelBg
 $currentConfigText.Dock = [System.Windows.Forms.DockStyle]::Fill
 $currentConfigText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
 $currentConfigText.WordWrap = $true
 $currentConfigText.Font = New-Object System.Drawing.Font('Consolas', 9.5)
 $currentConfigText.Text = '（アダプターを選択してください）'
+$currentConfigText.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6)
 
 $refreshConfigBtn = New-Object System.Windows.Forms.Button
 $refreshConfigBtn.Text = '再取得'
 $refreshConfigBtn.AutoSize = $true
+$refreshConfigBtn.MinimumSize = New-Object System.Drawing.Size(80, 28)
 
 $configBtnRow = New-Object System.Windows.Forms.FlowLayoutPanel
 $configBtnRow.Dock = [System.Windows.Forms.DockStyle]::Fill
 $configBtnRow.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
 $configBtnRow.AutoSize = $true
+$configBtnRow.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
 [void]$configBtnRow.Controls.Add($refreshConfigBtn)
 
 [void]$statusInner.Controls.Add($currentConfigText, 0, 0)
@@ -957,31 +1017,39 @@ $statusGroup.Controls.Add($statusInner)
 $presetGroup = New-Object System.Windows.Forms.GroupBox
 $presetGroup.Text = 'プリセット'
 $presetGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
-$presetGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+$presetGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
+$presetGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$presetGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 
 $presetLayout = New-Object System.Windows.Forms.TableLayoutPanel
 $presetLayout.Dock = [System.Windows.Forms.DockStyle]::Fill
 $presetLayout.ColumnCount = 2
 $presetLayout.RowCount = 1
-$presetLayout.Padding = New-Object System.Windows.Forms.Padding(8)
+$presetLayout.Padding = New-Object System.Windows.Forms.Padding(4, 6, 4, 4)
+$presetLayout.Font = Get-AppFont
 [void]$presetLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$presetLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 170)))
+[void]$presetLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 176)))
 
 $presetList = New-Object System.Windows.Forms.ListBox
 $presetList.Dock = [System.Windows.Forms.DockStyle]::Fill
 $presetList.Font = Get-AppFont -Size 10
 $presetList.IntegralHeight = $false
 $presetList.DisplayMember = 'Display'
+$presetList.BackColor = $script:PresetPanelBg
+$presetList.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$presetList.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
 
 $buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
 $buttonPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $buttonPanel.ColumnCount = 1
-$buttonPanel.RowCount = 6
-$buttonPanel.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
-for ($i = 0; $i -lt 5; $i++) {
+$buttonPanel.RowCount = 7
+$buttonPanel.Margin = New-Object System.Windows.Forms.Padding(12, 0, 0, 0)
+for ($i = 0; $i -lt 4; $i++) {
     [void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 }
 [void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+[void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+[void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
 
 $addBtn = New-Object System.Windows.Forms.Button
 $addBtn.Text = '追加(&A)'
@@ -995,21 +1063,31 @@ foreach ($b in @($addBtn, $editBtn, $deleteBtn)) {
     $b.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
 }
 
+# Thin separator above apply
+$applySep = New-Object System.Windows.Forms.Label
+$applySep.AutoSize = $false
+$applySep.Height = 1
+$applySep.Dock = [System.Windows.Forms.DockStyle]::Top
+$applySep.BackColor = $script:Hairline
+$applySep.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 10)
+
 $applyBtn = New-Object System.Windows.Forms.Button
 $applyBtn.Text = '適用'
 $applyBtn.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$applyBtn.Height = 56
+$applyBtn.Height = 52
 $applyBtn.BackColor = $script:AccentColor
 $applyBtn.ForeColor = [System.Drawing.Color]::White
 $applyBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $applyBtn.FlatAppearance.BorderSize = 0
 $applyBtn.Font = Get-AppFont -Size 12 -Style Bold
 $applyBtn.UseVisualStyleBackColor = $false
+$applyBtn.Margin = New-Object System.Windows.Forms.Padding(0)
 
 [void]$buttonPanel.Controls.Add($addBtn, 0, 0)
 [void]$buttonPanel.Controls.Add($editBtn, 0, 1)
 [void]$buttonPanel.Controls.Add($deleteBtn, 0, 2)
-[void]$buttonPanel.Controls.Add($applyBtn, 0, 5)
+[void]$buttonPanel.Controls.Add($applySep, 0, 5)
+[void]$buttonPanel.Controls.Add($applyBtn, 0, 6)
 [void]$presetLayout.Controls.Add($presetList, 0, 0)
 [void]$presetLayout.Controls.Add($buttonPanel, 1, 0)
 $presetGroup.Controls.Add($presetLayout)
@@ -1018,19 +1096,24 @@ $presetGroup.Controls.Add($presetLayout)
 $logGroup = New-Object System.Windows.Forms.GroupBox
 $logGroup.Text = 'ログ'
 $logGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$logGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$logGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 $logText = New-Object System.Windows.Forms.TextBox
 $logText.Multiline = $true
 $logText.ReadOnly = $true
 $logText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
 $logText.Dock = [System.Windows.Forms.DockStyle]::Fill
 $logText.Font = New-Object System.Drawing.Font('Consolas', 9)
-$logText.BackColor = [System.Drawing.Color]::White
+$logText.BackColor = $script:LogPanelBg
+$logText.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$logText.Margin = New-Object System.Windows.Forms.Padding(4, 6, 4, 4)
 $logGroup.Controls.Add($logText)
 
-[void]$root.Controls.Add($adapterRow, 0, 0)
-[void]$root.Controls.Add($statusGroup, 0, 1)
-[void]$root.Controls.Add($presetGroup, 0, 2)
-[void]$root.Controls.Add($logGroup, 0, 3)
+[void]$root.Controls.Add($titleBlock, 0, 0)
+[void]$root.Controls.Add($adapterRow, 0, 1)
+[void]$root.Controls.Add($statusGroup, 0, 2)
+[void]$root.Controls.Add($presetGroup, 0, 3)
+[void]$root.Controls.Add($logGroup, 0, 4)
 $form.Controls.Add($root)
 
 function Append-Log {

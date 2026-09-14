@@ -9,7 +9,7 @@ Windows のネットワークアダプター IPv4 設定を、名前付きプリ
    → ダウンロードブロック解除 + デスクトップショートカット作成
 3. `IpPreset.cmd`（またはショートカット）をダブルクリックして起動します。
 
-`IpPreset.cmd` は `ExecutionPolicy Bypass` と `Unblock-File` を行い、`IpPreset.ps1` を STA で起動します。
+`IpPreset.cmd` は `ExecutionPolicy Bypass` と `Unblock-File` を行い、`IpPreset.ps1` を STA で起動します（起動時に管理者昇格）。
 
 ## SmartScreen について
 
