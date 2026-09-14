@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IPプリセット</title>
-  <meta name="description" content="拠点・設備の IP 設定をプリセットで切り替える Windows ツール。">
+  <title>IPプリセット — 拠点の IP をすぐ切り替える</title>
+  <meta name="description" content="設備調整や別拠点で、Windows のアダプタ IP をプリセットから適用するツール。インストール不要。">
   <meta name="theme-color" content="#0B0C0E">
   <link rel="stylesheet" href="site.css">
 </head>
@@ -15,36 +15,115 @@
       <p class="ver">v0.1.0</p>
     </header>
 
-    <h1>IPプリセット</h1>
+    <h1>拠点の IP を、<br>プリセットで切り替える</h1>
     <p class="lead">
-      設備調整や別拠点で、アダプタの IP を何度も変えるための小さな Windows アプリです。
-      プリセットを選んで適用するだけ。インストールは不要です。
+      設備調整や別拠点に行くたびに、アダプタの固定 IP や DHCP を手で直していませんか。
+      IPプリセットは、よく使う設定に名前をつけておいて、選んだアダプタへ一発で適用する Windows 用ツールです。
     </p>
 
     <p class="cta">
       <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows 用をダウンロード</a>
-      <a class="textlink" href="https://github.com/grok-prtex/ip-preset">GitHub</a>
+      <a class="textlink" href="https://github.com/grok-prtex/ip-preset">ソースを見る</a>
     </p>
+    <p class="cta-note">約 60MB の zip · インストール不要 · Windows 10 / 11 x64</p>
+
+    <section>
+      <h2>こんなときに</h2>
+      <ul class="bullets">
+        <li>工場の設備網に合わせて、ノート PC の有線を固定 IP にしたい</li>
+        <li>拠点ごとにゲートウェイや DNS が違う</li>
+        <li>DHCP に戻すのも、また手作業が面倒</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>できること</h2>
+      <ul class="cards">
+        <li>
+          <strong>プリセット</strong>
+          <span>名前付きで DHCP / 固定 IP・マスク・ゲートウェイ・DNS を保存します。</span>
+        </li>
+        <li>
+          <strong>アダプタ指定</strong>
+          <span>一覧から対象のネットワークアダプタを選んで適用します。</span>
+        </li>
+        <li>
+          <strong>その場で確認</strong>
+          <span>いまの IP 設定を見ながら切り替えられます。</span>
+        </li>
+        <li>
+          <strong>持ち運び</strong>
+          <span>exe 横の JSON に保存。USB に入れて現場 PC でも使えます。</span>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>画面のイメージ</h2>
+      <div class="mock" role="img" aria-label="アプリ画面の簡易イメージ">
+        <div class="mock-title">IPプリセット</div>
+        <div class="mock-row"><span>アダプタ</span><em>Ethernet 2</em></div>
+        <div class="mock-row"><span>現在</span><em>192.168.10.42 /24</em></div>
+        <div class="mock-list">
+          <div class="on">工場A · 固定</div>
+          <div>本社 · DHCP</div>
+          <div>客先B · 固定</div>
+        </div>
+        <div class="mock-btn">適用</div>
+      </div>
+      <p class="note">実画面は WinForms のシンプルな一枚ものです。見た目より操作の短さを優先しています。</p>
+    </section>
 
     <section>
       <h2>使い方</h2>
       <ol>
-        <li>zip を展開する</li>
-        <li><code>IpPreset.exe</code> か <code>setup.cmd</code> を実行する</li>
-        <li>プリセットを作るか選ぶ</li>
-        <li>アダプタを選んで適用する</li>
+        <li>zip を展開する（好きなフォルダで大丈夫です）</li>
+        <li><code>IpPreset.exe</code> を実行する（初回は UAC で管理者承認）</li>
+        <li>プリセットを追加する。または同梱の例を編集する</li>
+        <li>アダプタを選んで「適用」</li>
       </ol>
-      <p class="note">適用のあいだ、ネットワークが短く切れます。</p>
+      <p class="note">デスクトップに置きたいときは <code>setup.cmd</code> でショートカットを作れます。</p>
     </section>
 
     <section>
-      <h2>動作環境</h2>
-      <p class="env">Windows 10 / 11（x64） · 管理者権限</p>
+      <h2>注意</h2>
+      <ul class="bullets">
+        <li>適用のあいだ、そのアダプタの通信が短く切れます</li>
+        <li>会社 PC のポリシーで管理者権限が取れない場合は使えません</li>
+        <li>VPN や Wi‑Fi プロファイル自体は扱いません（アダプタの IPv4 設定のみ）</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>よくある質問</h2>
+      <dl class="faq">
+        <div>
+          <dt>インストールは必要ですか？</dt>
+          <dd>不要です。zip を展開して実行するだけです。ランタイム同梱の単一 exe です。</dd>
+        </div>
+        <div>
+          <dt>設定はどこに保存されますか？</dt>
+          <dd>実行ファイルと同じフォルダの <code>presets.json</code> です。フォルダごとコピーすれば設定も一緒に移せます。</dd>
+        </div>
+        <div>
+          <dt>無料ですか？</dt>
+          <dd>はい。ソースは GitHub で公開しています。</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="closing">
+      <h2>ダウンロード</h2>
+      <p class="lead tight">現場用の設定切り替えを、手作業から外したい人向けです。</p>
+      <p class="cta">
+        <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows 用をダウンロード</a>
+        <a class="textlink" href="https://github.com/grok-prtex/ip-preset/releases/tag/v0.1.0">Release ノート</a>
+      </p>
     </section>
   </main>
 
   <footer>
-    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a></p>
+    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.1.0</p>
   </footer>
 </body>
 </html>
