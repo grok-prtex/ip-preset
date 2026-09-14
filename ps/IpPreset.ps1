@@ -193,15 +193,18 @@ function ConvertFrom-SubnetMaskToPrefix {
 
 function Resolve-PrefixLength {
     param($Preset)
+    # 未指定時は一般的な /24（255.255.255.0）を既定にする
     if ($null -ne $Preset.prefixLength -and "$($Preset.prefixLength)" -ne '') {
         $pl = [int]$Preset.prefixLength
         if ($pl -ge 0 -and $pl -le 32) { return $pl }
+        return $null
     }
-    if ($Preset.subnetMask) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$Preset.subnetMask)) {
         $fromMask = ConvertFrom-SubnetMaskToPrefix -Mask ([string]$Preset.subnetMask)
         if ($null -ne $fromMask) { return $fromMask }
+        return $null
     }
-    return $null
+    return 24
 }
 
 function Test-PresetValid {
@@ -216,7 +219,7 @@ function Test-PresetValid {
             [void]$errors.Add('IPv4アドレスの形式が正しくありません（例: 192.168.1.50）。')
         }
         if ($null -eq (Resolve-PrefixLength $Preset)) {
-            [void]$errors.Add('プレフィックス長（0〜32）またはサブネットマスクを正しく指定してください。')
+            [void]$errors.Add('サブネットの指定が不正です。空欄、24、または 255.255.255.0 などを指定してください。')
         }
         if (-not [string]::IsNullOrWhiteSpace([string]$Preset.gateway) -and -not (Test-ValidIPv4 ([string]$Preset.gateway))) {
             [void]$errors.Add('デフォルトゲートウェイの形式が正しくありません。')
@@ -514,7 +517,7 @@ function Show-PresetEditDialog {
     [void]$layout.Controls.Add($modePanel)
 
     Add-LabeledRow 'IPv4アドレス:' $ipv4Box '例: 192.168.1.50'
-    Add-LabeledRow 'サブネット:' $subnetBox 'プレフィックス長（例: 24）またはマスク（例: 255.255.255.0）'
+    Add-LabeledRow 'サブネット:' $subnetBox '任意。空欄なら 255.255.255.0（24）'
     Add-LabeledRow 'ゲートウェイ:' $gatewayBox '任意。例: 192.168.1.1'
     Add-LabeledRow 'DNSサーバー:' $dnsBox '任意。カンマ区切り（例: 8.8.8.8, 1.1.1.1）'
     Add-LabeledRow 'メモ:' $noteBox '任意'
