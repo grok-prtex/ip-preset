@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   配布の主成果物です。署名なし .exe の SmartScreen を避けるため PowerShell + .cmd で起動します。
-  適用時のみ UAC 昇格します（起動時は管理者不要）。
+  起動時に UAC（管理者）確認があります。
 
 .NOTES
   presets.json は本スクリプトと同じフォルダに保存します（C# 版と同一スキーマ）。
@@ -114,6 +114,47 @@ if ($ApplyOnly) {
     }
 }
 
+function Test-IsElevated {
+    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $p = New-Object Security.Principal.WindowsPrincipal($id)
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# ---------------------------------------------------------------------------
+# Always require admin on launch (skip for -ApplyOnly elevated child)
+# ---------------------------------------------------------------------------
+if (-not (Test-IsElevated)) {
+    function Quote-Arg([string]$s) {
+        if ($null -eq $s) { $s = '' }
+        return '"' + ($s.Replace('"', '""')) + '"'
+    }
+    # UseShellExecute/Verb=RunAs では ArgumentList の空文字が欠落しやすいため、1本の引数文字列にする
+    $argParts = New-Object System.Collections.Generic.List[string]
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy Bypass', '-STA', '-File', (Quote-Arg $script:ScriptPath))) {
+        [void]$argParts.Add($a)
+    }
+    foreach ($key in $PSBoundParameters.Keys) {
+        $val = $PSBoundParameters[$key]
+        if ($val -is [System.Management.Automation.SwitchParameter]) {
+            if ($val) { [void]$argParts.Add("-$key") }
+        }
+        else {
+            [void]$argParts.Add("-$key")
+            [void]$argParts.Add((Quote-Arg ([string]$val)))
+        }
+    }
+    $arguments = $argParts -join ' '
+    try {
+        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+    }
+    catch {
+        # UAC cancel often surfaces as Win32 exception
+        exit 1
+    }
+    if ($null -eq $proc) { exit 1 }
+    exit $proc.ExitCode
+}
+
 # ---------------------------------------------------------------------------
 # GUI requires STA
 # ---------------------------------------------------------------------------
@@ -154,12 +195,6 @@ function Get-AppFont {
         catch { }
     }
     return New-Object System.Drawing.Font('Microsoft Sans Serif', $Size, $Style)
-}
-
-function Test-IsElevated {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $p = New-Object Security.Principal.WindowsPrincipal($id)
-    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Test-ValidIPv4 {
@@ -446,12 +481,13 @@ function Show-PresetEditDialog {
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
     $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
-    $dlg.ClientSize = New-Object System.Drawing.Size(440, 470)
+    $dlg.ClientSize = New-Object System.Drawing.Size(440, 520)
     $dlg.Font = Get-AppFont
     $dlg.ShowInTaskbar = $false
 
     $layout = New-Object System.Windows.Forms.TableLayoutPanel
     $layout.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $layout.AutoScroll = $true
     $layout.ColumnCount = 2
     $layout.Padding = New-Object System.Windows.Forms.Padding(16)
     [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
@@ -612,11 +648,15 @@ function Show-PresetEditDialog {
 
     $dlg.AcceptButton = $okBtn
     $dlg.CancelButton = $cancelBtn
-    $dlg.Controls.Add($layout)
+    # Dock Bottom first, then Fill — Fill added first would cover the buttons
     $dlg.Controls.Add($btnPanel)
+    $dlg.Controls.Add($layout)
 
-    $null = $dlg.ShowDialog($Owner)
-    return $script:EditResult
+    $dr = $dlg.ShowDialog($Owner)
+    if ($dr -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $script:EditResult
+    }
+    return $null
 }
 
 function Show-AdapterPickDialog {
@@ -690,9 +730,10 @@ function Show-AdapterPickDialog {
 
     $dlg.AcceptButton = $applyBtn
     $dlg.CancelButton = $cancelBtn
-    $dlg.Controls.Add($list)
+    # Dock Bottom/Top before Fill — Fill added first would cover the buttons
     $dlg.Controls.Add($btnPanel)
     $dlg.Controls.Add($info)
+    $dlg.Controls.Add($list)
 
     $null = $dlg.ShowDialog()
     if ($dlg.DialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -1215,7 +1256,7 @@ $applyBtn.Add_Click({
 })
 
 $form.Add_Shown({
-    $elevNote = if (Test-IsElevated) { '管理者権限で起動しています。' } else { '通常権限で起動しています（適用時にUAC確認があります）。' }
+    $elevNote = if (Test-IsElevated) { '管理者権限で起動しています。' } else { '管理者権限が必要です（起動時にUAC確認があります）。' }
     Append-Log "起動しました。$elevNote"
     Load-PresetsIntoUi
     Refresh-AdapterList
