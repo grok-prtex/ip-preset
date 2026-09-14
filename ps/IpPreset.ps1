@@ -608,8 +608,8 @@ $script:Adapters = @()
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'IPプリセット'
-$form.ClientSize = New-Object System.Drawing.Size(780, 700)
-$form.MinimumSize = New-Object System.Drawing.Size(700, 620)
+$form.ClientSize = New-Object System.Drawing.Size(780, 760)
+$form.MinimumSize = New-Object System.Drawing.Size(700, 680)
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.Font = Get-AppFont
 
@@ -619,7 +619,7 @@ $root.ColumnCount = 1
 $root.RowCount = 4
 $root.Padding = New-Object System.Windows.Forms.Padding(12)
 [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
-[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 240)))
 [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 170)))
 
@@ -672,6 +672,8 @@ $currentConfigText.ReadOnly = $true
 $currentConfigText.BorderStyle = [System.Windows.Forms.BorderStyle]::None
 $currentConfigText.BackColor = [System.Drawing.SystemColors]::Control
 $currentConfigText.Dock = [System.Windows.Forms.DockStyle]::Fill
+$currentConfigText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+$currentConfigText.WordWrap = $true
 $currentConfigText.Font = New-Object System.Drawing.Font('Consolas', 9.5)
 $currentConfigText.Text = '（アダプターを選択してください）'
 
