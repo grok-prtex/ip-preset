@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     IPプリセット (IpPreset) を Windows x64 向けの自己完結・単一ファイル実行形式(exe)として発行します。

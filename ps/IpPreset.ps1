@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   IPプリセット — ネットワークアダプターのIPv4設定をプリセットで切り替える WinForms GUI（PowerShell）
