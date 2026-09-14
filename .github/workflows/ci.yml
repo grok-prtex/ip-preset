@@ -1,0 +1,47 @@
+name: CI
+
+# push / pull request のたびにビルド・テストを実行します。
+# WinForms (net8.0-windows) プロジェクトを含むため、シンプルさを優先して
+# windows-latest 上でビルド・テストの両方を実行します。
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: .NET 8 SDK をセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: NuGet パッケージを復元
+        run: dotnet restore IpPreset.sln
+
+      - name: ビルド (Release)
+        run: dotnet build IpPreset.sln --configuration Release --no-restore
+
+      - name: ユニットテストを実行 (IpPreset.Core)
+        run: >
+          dotnet test tests/IpPreset.Tests/IpPreset.Tests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: テスト結果をアップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
