@@ -3,60 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IPプリセット — Grok Prtex</title>
-  <meta name="description" content="拠点・設備ごとにIP設定を切り替える Windows ツール。zip を展開して使います。">
+  <title>IPプリセット — ぐろっく</title>
+  <meta name="description" content="拠点のIPをプリセットで切り替える。Windows用、zip展開だけ。">
   <meta name="theme-color" content="#0B0C0E">
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="wrap">
-      <div class="brand">Grok Prtex · <strong>IPプリセット</strong></div>
-      <div class="ver">v0.1.0</div>
+  <div class="rail" aria-hidden="true"></div>
+
+  <div class="shell">
+    <p class="who">ぐろっく <span>/</span> Grok Prtex</p>
+
+    <p class="prompt" aria-hidden="true"><span class="caret">›</span> open ip-preset</p>
+
+    <h1>IPプリセット</h1>
+    <p class="tag">現場PCの IP を、名前付きで切り替える。</p>
+
+    <p class="blurb">
+      設備調整や別拠点で、アダプタの固定IP／DHCPを何度も触るのが面倒なので作りました。
+      インストールなし。zip を展開して exe を叩くだけです。
+    </p>
+
+    <div class="actions">
+      <a class="dl" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">zip を取る <span class="meta">v0.1.0 · win-x64</span></a>
+      <a class="src" href="https://github.com/grok-prtex/ip-preset">ソース</a>
     </div>
-  </header>
 
-  <main>
-    <div class="wrap">
-      <h1>IPプリセット</h1>
-      <p class="lead">拠点・設備ごとに IP 設定を切り替える Windows ツールです。zip を展開して使います。</p>
+    <pre class="run" tabindex="0"><code>1  zip を展開
+2  IpPreset.exe  （または setup.cmd）
+3  プリセットを作る／選ぶ
+4  アダプタを選んで適用</code></pre>
 
-      <div class="cta-row">
-        <a class="btn" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows用 zip をダウンロード</a>
-        <a class="link-quiet" href="https://github.com/grok-prtex/ip-preset">GitHub</a>
-      </div>
+    <p class="warn">適用の瞬間、通信が一度切れます。驚かないでください。</p>
 
-      <div class="block">
-        <h2>使い方</h2>
-        <ol class="howto">
-          <li>配布 zip を展開します。</li>
-          <li><code>IpPreset.exe</code> または <code>setup.cmd</code> を実行します。</li>
-          <li>プリセットを作成または選びます。</li>
-          <li>アダプタを選んで適用します。</li>
-        </ol>
-        <p class="note">適用時に、ネットワークが一瞬切れることがあります。</p>
-      </div>
+    <dl class="spec">
+      <div><dt>OS</dt><dd>Windows 10 / 11 · x64</dd></div>
+      <div><dt>権限</dt><dd>管理者（UAC）</dd></div>
+    </dl>
 
-      <div class="block">
-        <h2>動作環境</h2>
-        <ul class="env">
-          <li>
-            <span class="k">OS</span>
-            <span class="v">Windows 10 / 11 x64</span>
-          </li>
-          <li>
-            <span class="k">権限</span>
-            <span class="v">管理者権限</span>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap">
-      <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.1.0</p>
-    </div>
-  </footer>
+    <footer>
+      <span>ぐろっくが配ってるやつ</span>
+      <span class="sep">·</span>
+      <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a>
+    </footer>
+  </div>
 </body>
 </html>
