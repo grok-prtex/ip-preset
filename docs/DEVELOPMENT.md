@@ -3,6 +3,12 @@
 このドキュメントは `IPプリセット` (IpPreset) の開発・ビルド・テストに関する情報をまとめたものです。
 利用者向けの使い方は [`README.md`](../README.md)、配布方法は [`DISTRIBUTE.md`](../DISTRIBUTE.md) を参照してください。
 
+
+## 0. 配布の主成果物（PowerShell）
+
+エンドユーザー向けの推奨配布は [`ps/`](../ps/) です（SmartScreen 回避）。  
+C# WinForms / `dotnet publish` は開発・互換用にリポジトリへ残していますが、Release の主アセットは `IpPreset-win.zip`（`ps/` の中身）です。
+
 ## 1. 技術スタック
 
 - .NET 8 (SDK 8.0系)

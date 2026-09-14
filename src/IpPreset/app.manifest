@@ -3,15 +3,13 @@
   <assemblyIdentity version="1.0.0.0" name="IpPreset.app" />
 
   <!--
-    NICのIP設定変更（New-NetIPAddress / Set-NetIPInterface 等）には管理者権限が必須のため、
-    このアプリは起動時に常にUACの昇格を要求します（requireAdministrator）。
-    「必要な時だけ昇格」ではなく起動時に一括で昇格させることで、
-    アプリ内で権限不足エラーが発生する状況を避け、動作を単純かつ確実にしています。
+    通常起動は asInvoker（非昇格）。NIC の IP 設定変更時のみ、適用処理が
+    PowerShell を Verb=runas で起動して UAC 昇格を求めます。
   -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

@@ -12,7 +12,7 @@
   <main>
     <header>
       <p class="mark">ぐろっく</p>
-      <p class="ver">v0.1.0</p>
+      <p class="ver">v0.2.0</p>
     </header>
 
     <h1>拠点の IP を、<br>プリセットで切り替える</h1>
@@ -22,10 +22,10 @@
     </p>
 
     <p class="cta">
-      <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows 用をダウンロード</a>
+      <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.2.0/IpPreset-win.zip">Windows 用をダウンロード</a>
       <a class="textlink" href="https://github.com/grok-prtex/ip-preset">ソースを見る</a>
     </p>
-    <p class="cta-note">約 60MB の zip · インストール不要 · Windows 10 / 11 x64</p>
+    <p class="cta-note">軽量 zip（PowerShell）· インストール不要 · SmartScreen回避 · Windows 10 / 11</p>
 
     <section>
       <h2>こんなときに</h2>
@@ -53,7 +53,7 @@
         </li>
         <li>
           <strong>持ち運び</strong>
-          <span>exe 横の JSON に保存。USB に入れて現場 PC でも使えます。</span>
+          <span>スクリプト横の JSON に保存。USB に入れて現場 PC でも使えます。</span>
         </li>
       </ul>
     </section>
@@ -71,18 +71,18 @@
         </div>
         <div class="mock-btn">適用</div>
       </div>
-      <p class="note">実画面は WinForms のシンプルな一枚ものです。見た目より操作の短さを優先しています。</p>
+      <p class="note">実画面は PowerShell WinForms のシンプルな一枚ものです。見た目より操作の短さを優先しています。</p>
     </section>
 
     <section>
       <h2>使い方</h2>
       <ol>
         <li>zip を展開する（好きなフォルダで大丈夫です）</li>
-        <li><code>IpPreset.exe</code> を実行する（初回は UAC で管理者承認）</li>
-        <li>プリセットを追加する。または同梱の例を編集する</li>
-        <li>アダプタを選んで「適用」</li>
+        <li>（推奨）<code>setup.cmd</code> でブロック解除とショートカット作成</li>
+        <li><code>IpPreset.cmd</code> を実行する（起動時 UAC なし）</li>
+        <li>プリセットを追加し、アダプタを選んで「適用」（適用時のみ UAC）</li>
       </ol>
-      <p class="note">デスクトップに置きたいときは <code>setup.cmd</code> でショートカットを作れます。</p>
+      <p class="note">ダウンロードでスクリプトがブロックされたときも <code>setup.cmd</code> で解除できます。</p>
     </section>
 
     <section>
@@ -99,11 +99,11 @@
       <dl class="faq">
         <div>
           <dt>インストールは必要ですか？</dt>
-          <dd>不要です。zip を展開して実行するだけです。ランタイム同梱の単一 exe です。</dd>
+          <dd>不要です。zip を展開して <code>IpPreset.cmd</code> を実行するだけです（Windows 標準の PowerShell）。</dd>
         </div>
         <div>
           <dt>設定はどこに保存されますか？</dt>
-          <dd>実行ファイルと同じフォルダの <code>presets.json</code> です。フォルダごとコピーすれば設定も一緒に移せます。</dd>
+          <dd>スクリプトと同じフォルダの <code>presets.json</code> です。フォルダごとコピーすれば設定も一緒に移せます。</dd>
         </div>
         <div>
           <dt>無料ですか？</dt>
@@ -116,14 +116,14 @@
       <h2>ダウンロード</h2>
       <p class="lead tight">現場用の設定切り替えを、手作業から外したい人向けです。</p>
       <p class="cta">
-        <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.1.0/IpPreset-win-x64.zip">Windows 用をダウンロード</a>
-        <a class="textlink" href="https://github.com/grok-prtex/ip-preset/releases/tag/v0.1.0">Release ノート</a>
+        <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.2.0/IpPreset-win.zip">Windows 用をダウンロード</a>
+        <a class="textlink" href="https://github.com/grok-prtex/ip-preset/releases/tag/v0.2.0">Release ノート</a>
       </p>
     </section>
   </main>
 
   <footer>
-    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.1.0</p>
+    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.2.0</p>
   </footer>
 </body>
 </html>

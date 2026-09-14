@@ -1,0 +1,1001 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+  IPプリセット — ネットワークアダプターのIPv4設定をプリセットで切り替える WinForms GUI（PowerShell）
+
+.DESCRIPTION
+  配布の主成果物です。署名なし .exe の SmartScreen を避けるため PowerShell + .cmd で起動します。
+  適用時のみ UAC 昇格します（起動時は管理者不要）。
+
+.NOTES
+  presets.json は本スクリプトと同じフォルダに保存します（C# 版と同一スキーマ）。
+#>
+[CmdletBinding()]
+param(
+    [switch]$ApplyOnly,
+    [ValidateSet('Dhcp', 'Static')]
+    [string]$Mode,
+    [int]$IfIndex = -1,
+    [string]$IpAddress = '',
+    [int]$PrefixLength = -1,
+    [string]$Gateway = '',
+    [string]$Dns = '',
+    [string]$ResultFile = ''
+)
+
+$ErrorActionPreference = 'Stop'
+$script:ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $script:ScriptDir) { $script:ScriptDir = $PSScriptRoot }
+$script:PresetsPath = Join-Path $script:ScriptDir 'presets.json'
+$script:ScriptPath = $MyInvocation.MyCommand.Path
+if (-not $script:ScriptPath) { $script:ScriptPath = $PSCommandPath }
+
+# ---------------------------------------------------------------------------
+# Apply-only path (elevated child process)
+# ---------------------------------------------------------------------------
+function Remove-ExistingIPv4Address {
+    param([int]$InterfaceIndex)
+    Get-NetIPAddress -InterfaceIndex $InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+function Invoke-IpApplyCore {
+    param(
+        [Parameter(Mandatory)][ValidateSet('Dhcp', 'Static')][string]$Mode,
+        [Parameter(Mandatory)][int]$IfIndex,
+        [string]$IpAddress = '',
+        [int]$PrefixLength = -1,
+        [string]$Gateway = '',
+        [string]$Dns = ''
+    )
+
+    if ($Mode -eq 'Static') {
+        if ([string]::IsNullOrWhiteSpace($IpAddress)) {
+            throw 'IPv4アドレスが指定されていません。'
+        }
+        if ($PrefixLength -lt 0 -or $PrefixLength -gt 32) {
+            throw 'プレフィックス長が不正です。'
+        }
+
+        Remove-ExistingIPv4Address -InterfaceIndex $IfIndex
+
+        Get-NetRoute -InterfaceIndex $IfIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+            Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue
+
+        Set-NetIPInterface -InterfaceIndex $IfIndex -Dhcp Disabled -ErrorAction SilentlyContinue
+
+        if ([string]::IsNullOrWhiteSpace($Gateway)) {
+            New-NetIPAddress -InterfaceIndex $IfIndex -IPAddress $IpAddress -PrefixLength $PrefixLength -ErrorAction Stop | Out-Null
+        }
+        else {
+            New-NetIPAddress -InterfaceIndex $IfIndex -IPAddress $IpAddress -PrefixLength $PrefixLength -DefaultGateway $Gateway -ErrorAction Stop | Out-Null
+        }
+
+        if ([string]::IsNullOrWhiteSpace($Dns)) {
+            Set-DnsClientServerAddress -InterfaceIndex $IfIndex -ResetServerAddresses
+        }
+        else {
+            $dnsList = $Dns -split ',' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }
+            Set-DnsClientServerAddress -InterfaceIndex $IfIndex -ServerAddresses $dnsList
+        }
+    }
+    else {
+        Remove-ExistingIPv4Address -InterfaceIndex $IfIndex
+        Set-NetIPInterface -InterfaceIndex $IfIndex -Dhcp Enabled
+        Set-DnsClientServerAddress -InterfaceIndex $IfIndex -ResetServerAddresses
+    }
+
+    return 'RESULT_OK'
+}
+
+if ($ApplyOnly) {
+    try {
+        $out = Invoke-IpApplyCore -Mode $Mode -IfIndex $IfIndex -IpAddress $IpAddress `
+            -PrefixLength $PrefixLength -Gateway $Gateway -Dns $Dns
+        if ($ResultFile) {
+            Set-Content -LiteralPath $ResultFile -Value $out -Encoding UTF8
+        }
+        else {
+            Write-Output $out
+        }
+        exit 0
+    }
+    catch {
+        $msg = $_.Exception.Message
+        if ($ResultFile) {
+            Set-Content -LiteralPath $ResultFile -Value $msg -Encoding UTF8
+        }
+        else {
+            Write-Error $msg
+        }
+        exit 1
+    }
+}
+
+# ---------------------------------------------------------------------------
+# GUI requires STA
+# ---------------------------------------------------------------------------
+if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
+    $argsList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', $MyInvocation.MyCommand.Path) + $args
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -Wait
+    exit $LASTEXITCODE
+}
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+[System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+$script:AccentColor = [System.Drawing.ColorTranslator]::FromHtml('#FF6B2C')
+$script:ErrorColor = [System.Drawing.ColorTranslator]::FromHtml('#B3261E')
+
+
+function Get-AppFont {
+    param([float]$Size = 9.5, [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular)
+    foreach ($name in @('Yu Gothic UI', 'Meiryo UI', 'Segoe UI')) {
+        try {
+            return New-Object System.Drawing.Font($name, $Size, $Style)
+        }
+        catch { }
+    }
+    return New-Object System.Drawing.Font('Microsoft Sans Serif', $Size, $Style)
+}
+
+function Test-IsElevated {
+    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $p = New-Object Security.Principal.WindowsPrincipal($id)
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Test-ValidIPv4 {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    $ip = $null
+    if (-not [System.Net.IPAddress]::TryParse($Value, [ref]$ip)) { return $false }
+    return $ip.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork
+}
+
+function ConvertFrom-SubnetMaskToPrefix {
+    param([string]$Mask)
+    if (-not (Test-ValidIPv4 $Mask)) { return $null }
+    $addr = [System.Net.IPAddress]::Parse($Mask)
+    $bytes = $addr.GetAddressBytes()
+    [uint32]$value = ([uint32]$bytes[0] -shl 24) -bor ([uint32]$bytes[1] -shl 16) -bor ([uint32]$bytes[2] -shl 8) -bor $bytes[3]
+    $zeros = 0
+    $seenZero = $false
+    for ($i = 31; $i -ge 0; $i--) {
+        $bit = ($value -shr $i) -band 1
+        if ($bit -eq 0) {
+            $seenZero = $true
+            $zeros++
+        }
+        elseif ($seenZero) {
+            return $null
+        }
+    }
+    return (32 - $zeros)
+}
+
+function Resolve-PrefixLength {
+    param($Preset)
+    if ($null -ne $Preset.prefixLength -and "$($Preset.prefixLength)" -ne '') {
+        $pl = [int]$Preset.prefixLength
+        if ($pl -ge 0 -and $pl -le 32) { return $pl }
+    }
+    if ($Preset.subnetMask) {
+        $fromMask = ConvertFrom-SubnetMaskToPrefix -Mask ([string]$Preset.subnetMask)
+        if ($null -ne $fromMask) { return $fromMask }
+    }
+    return $null
+}
+
+function Test-PresetValid {
+    param($Preset)
+    $errors = New-Object System.Collections.Generic.List[string]
+    if ([string]::IsNullOrWhiteSpace([string]$Preset.name)) {
+        [void]$errors.Add('プリセット名を入力してください。')
+    }
+    $mode = ([string]$Preset.mode).ToLowerInvariant()
+    if ($mode -eq 'static') {
+        if (-not (Test-ValidIPv4 ([string]$Preset.ipv4))) {
+            [void]$errors.Add('IPv4アドレスの形式が正しくありません（例: 192.168.1.50）。')
+        }
+        if ($null -eq (Resolve-PrefixLength $Preset)) {
+            [void]$errors.Add('プレフィックス長（0〜32）またはサブネットマスクを正しく指定してください。')
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$Preset.gateway) -and -not (Test-ValidIPv4 ([string]$Preset.gateway))) {
+            [void]$errors.Add('デフォルトゲートウェイの形式が正しくありません。')
+        }
+        $dnsList = @()
+        if ($Preset.dns) { $dnsList = @($Preset.dns) }
+        foreach ($d in $dnsList) {
+            if (-not (Test-ValidIPv4 ([string]$d))) {
+                [void]$errors.Add("DNSサーバーの形式が正しくありません: $d")
+            }
+        }
+    }
+    return $errors
+}
+
+function Get-DefaultPresets {
+    @(
+        [pscustomobject]@{
+            name = '自動取得（DHCP）'
+            mode = 'dhcp'
+            note = '通常のオフィス・自宅ネットワークなど、DHCPサーバーがある環境向けです。'
+        }
+        [pscustomobject]@{
+            name         = '工場ライン例（静的IP）'
+            mode         = 'static'
+            ipv4         = '192.168.10.50'
+            prefixLength = 24
+            gateway      = '192.168.10.1'
+            dns          = @('192.168.10.1')
+            note         = 'サンプルです。現場のIP体系に合わせて編集してください。'
+        }
+    )
+}
+
+function ConvertTo-PresetObject {
+    param($Raw)
+    $mode = ([string]$Raw.mode).ToLowerInvariant()
+    if ($mode -ne 'static') { $mode = 'dhcp' }
+    $dns = @()
+    if ($Raw.dns) { $dns = @($Raw.dns | ForEach-Object { [string]$_ }) }
+    $obj = [ordered]@{
+        name = [string]$Raw.name
+        mode = $mode
+    }
+    if ($mode -eq 'static') {
+        if ($Raw.ipv4) { $obj.ipv4 = [string]$Raw.ipv4 }
+        if ($null -ne $Raw.prefixLength -and "$($Raw.prefixLength)" -ne '') {
+            $obj.prefixLength = [int]$Raw.prefixLength
+        }
+        elseif ($Raw.subnetMask) {
+            $obj.subnetMask = [string]$Raw.subnetMask
+        }
+        if ($Raw.gateway) { $obj.gateway = [string]$Raw.gateway }
+        $obj.dns = $dns
+    }
+    if ($Raw.note) { $obj.note = [string]$Raw.note }
+    return [pscustomobject]$obj
+}
+
+function Read-Presets {
+    if (-not (Test-Path -LiteralPath $script:PresetsPath)) {
+        $seed = @(Get-DefaultPresets)
+        Write-Presets -Presets $seed
+        return $seed
+    }
+    $json = Get-Content -LiteralPath $script:PresetsPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($json)) { return @() }
+    $raw = $json | ConvertFrom-Json
+    $list = @()
+    foreach ($item in @($raw)) {
+        $list += ConvertTo-PresetObject $item
+    }
+    return $list
+}
+
+function Write-Presets {
+    param([object[]]$Presets)
+    $normalized = @()
+    foreach ($p in $Presets) {
+        $normalized += ConvertTo-PresetObject $p
+    }
+    $json = $normalized | ConvertTo-Json -Depth 6
+    if ($normalized.Count -eq 1) {
+        # ConvertTo-Json emits a single object when Count=1; wrap as array
+        $json = '[' + ($normalized[0] | ConvertTo-Json -Depth 6) + ']'
+    }
+    elseif ($normalized.Count -eq 0) {
+        $json = '[]'
+    }
+    $tmp = $script:PresetsPath + '.tmp'
+    [System.IO.File]::WriteAllText($tmp, $json, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::Copy($tmp, $script:PresetsPath, $true)
+    [System.IO.File]::Delete($tmp)
+}
+
+function Get-AdapterList {
+    $adapters = @()
+    try {
+        $adapters = @(Get-NetAdapter -ErrorAction Stop |
+            Where-Object { $_.HardwareInterface -eq $true -or $_.InterfaceDescription -notmatch 'Loopback|Tunnel|Pseudo' } |
+            Sort-Object { if ($_.Status -eq 'Up') { 0 } else { 1 } }, Name)
+    }
+    catch {
+        # fallback: all adapters except loopback names
+        $adapters = @(Get-NetAdapter -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'Loopback' } |
+            Sort-Object Name)
+    }
+    return $adapters
+}
+
+function Get-CurrentConfigText {
+    param($Adapter)
+    if (-not $Adapter) { return '（アダプターを選択してください）' }
+    $ifIndex = [int]$Adapter.ifIndex
+    $lines = New-Object System.Collections.Generic.List[string]
+    [void]$lines.Add("アダプター: $($Adapter.Name)")
+    [void]$lines.Add("状態: $($Adapter.Status)")
+    [void]$lines.Add("MAC: $($Adapter.MacAddress)")
+
+    $ip = Get-NetIPAddress -InterfaceIndex $ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notlike '169.254.*' } |
+        Select-Object -First 1
+    $iface = Get-NetIPInterface -InterfaceIndex $ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+    $dhcp = if ($iface -and $iface.Dhcp -eq 'Enabled') { 'DHCP（自動取得）' } else { '静的' }
+    [void]$lines.Add("モード: $dhcp")
+    if ($ip) {
+        [void]$lines.Add("IPv4: $($ip.IPAddress)/$($ip.PrefixLength)")
+    }
+    else {
+        [void]$lines.Add('IPv4: （なし）')
+    }
+    $gw = Get-NetRoute -InterfaceIndex $ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty NextHop
+    [void]$lines.Add("ゲートウェイ: $(if ($gw) { $gw } else { '（なし）' })")
+    $dnsServers = @(Get-DnsClientServerAddress -InterfaceIndex $ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty ServerAddresses)
+    $dnsText = if ($dnsServers.Count -gt 0) { ($dnsServers -join ', ') } else { '（なし）' }
+    [void]$lines.Add("DNS: $dnsText")
+    return ($lines -join "`r`n")
+}
+
+function Invoke-ApplyPreset {
+    param(
+        [Parameter(Mandatory)][int]$IfIndex,
+        [Parameter(Mandatory)]$Preset
+    )
+
+    $mode = if (([string]$Preset.mode).ToLowerInvariant() -eq 'static') { 'Static' } else { 'Dhcp' }
+    $prefix = -1
+    $ip = ''
+    $gw = ''
+    $dnsCsv = ''
+    if ($mode -eq 'Static') {
+        $ip = [string]$Preset.ipv4
+        $prefix = Resolve-PrefixLength $Preset
+        if ($null -eq $prefix) { throw 'プレフィックス長を解決できませんでした。' }
+        if ($Preset.gateway) { $gw = [string]$Preset.gateway }
+        if ($Preset.dns) { $dnsCsv = (@($Preset.dns) -join ',') }
+    }
+
+    if (Test-IsElevated) {
+        return (Invoke-IpApplyCore -Mode $mode -IfIndex $IfIndex -IpAddress $ip -PrefixLength $prefix -Gateway $gw -Dns $dnsCsv)
+    }
+
+    $resultFile = Join-Path $env:TEMP ("ippreset-apply-{0}.txt" -f [guid]::NewGuid().ToString('N'))
+    function Quote-Arg([string]$s) {
+        if ($null -eq $s) { $s = '' }
+        return '"' + ($s.Replace('"', '""')) + '"'
+    }
+    # UseShellExecute/Verb=RunAs では ArgumentList の空文字が欠落しやすいため、1本の引数文字列にする
+    $arguments = @(
+        '-NoProfile'
+        '-ExecutionPolicy Bypass'
+        '-File'
+        (Quote-Arg $script:ScriptPath)
+        '-ApplyOnly'
+        '-Mode'
+        (Quote-Arg $mode)
+        '-IfIndex'
+        (Quote-Arg "$IfIndex")
+        '-IpAddress'
+        (Quote-Arg $ip)
+        '-PrefixLength'
+        (Quote-Arg "$prefix")
+        '-Gateway'
+        (Quote-Arg $gw)
+        '-Dns'
+        (Quote-Arg $dnsCsv)
+        '-ResultFile'
+        (Quote-Arg $resultFile)
+    ) -join ' '
+
+    try {
+        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
+    }
+    catch {
+        # UAC cancel often surfaces as Win32 exception
+        throw '管理者権限の承認がキャンセルされました。'
+    }
+
+    $output = ''
+    if (Test-Path -LiteralPath $resultFile) {
+        $output = Get-Content -LiteralPath $resultFile -Raw -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($proc.ExitCode -ne 0 -or ($output -notmatch 'RESULT_OK')) {
+        $detail = if ($output) { $output.Trim() } else { "終了コード $($proc.ExitCode)" }
+        throw "適用に失敗しました: $detail"
+    }
+    return 'RESULT_OK'
+}
+
+function Show-PresetEditDialog {
+    param(
+        [System.Windows.Forms.Form]$Owner,
+        $Initial
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = 'プリセットの編集'
+    $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
+    $dlg.ClientSize = New-Object System.Drawing.Size(440, 470)
+    $dlg.Font = Get-AppFont
+    $dlg.ShowInTaskbar = $false
+
+    $layout = New-Object System.Windows.Forms.TableLayoutPanel
+    $layout.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $layout.ColumnCount = 2
+    $layout.Padding = New-Object System.Windows.Forms.Padding(16)
+    [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
+    [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+
+    $nameBox = New-Object System.Windows.Forms.TextBox
+    $nameBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $dhcpRadio = New-Object System.Windows.Forms.RadioButton
+    $dhcpRadio.Text = 'DHCP（自動取得）'
+    $dhcpRadio.AutoSize = $true
+    $staticRadio = New-Object System.Windows.Forms.RadioButton
+    $staticRadio.Text = '静的（手動設定）'
+    $staticRadio.AutoSize = $true
+    $ipv4Box = New-Object System.Windows.Forms.TextBox
+    $ipv4Box.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $subnetBox = New-Object System.Windows.Forms.TextBox
+    $subnetBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gatewayBox = New-Object System.Windows.Forms.TextBox
+    $gatewayBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $dnsBox = New-Object System.Windows.Forms.TextBox
+    $dnsBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $noteBox = New-Object System.Windows.Forms.TextBox
+    $noteBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $errorLabel = New-Object System.Windows.Forms.Label
+    $errorLabel.ForeColor = $script:ErrorColor
+    $errorLabel.AutoSize = $true
+    $errorLabel.MaximumSize = New-Object System.Drawing.Size(280, 0)
+
+    function Add-LabeledRow([string]$labelText, [System.Windows.Forms.Control]$control, [string]$hint = $null) {
+        $lbl = New-Object System.Windows.Forms.Label
+        $lbl.Text = $labelText
+        $lbl.AutoSize = $true
+        $lbl.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+        $lbl.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+        [void]$layout.Controls.Add($lbl)
+        $control.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 4)
+        [void]$layout.Controls.Add($control)
+        if ($hint) {
+            $hintLbl = New-Object System.Windows.Forms.Label
+            $hintLbl.Text = $hint
+            $hintLbl.AutoSize = $true
+            $hintLbl.ForeColor = [System.Drawing.SystemColors]::GrayText
+            $hintLbl.Font = Get-AppFont -Size 8
+            $hintLbl.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
+            [void]$layout.Controls.Add((New-Object System.Windows.Forms.Label))
+            [void]$layout.Controls.Add($hintLbl)
+        }
+    }
+
+    Add-LabeledRow 'プリセット名:' $nameBox
+    $modePanel = New-Object System.Windows.Forms.FlowLayoutPanel
+    $modePanel.AutoSize = $true
+    $modePanel.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
+    $dhcpRadio.Margin = New-Object System.Windows.Forms.Padding(0, 4, 16, 4)
+    $staticRadio.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 4)
+    [void]$modePanel.Controls.Add($dhcpRadio)
+    [void]$modePanel.Controls.Add($staticRadio)
+    $modeLbl = New-Object System.Windows.Forms.Label
+    $modeLbl.Text = 'モード:'
+    $modeLbl.AutoSize = $true
+    $modeLbl.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+    [void]$layout.Controls.Add($modeLbl)
+    [void]$layout.Controls.Add($modePanel)
+
+    Add-LabeledRow 'IPv4アドレス:' $ipv4Box '例: 192.168.1.50'
+    Add-LabeledRow 'サブネット:' $subnetBox 'プレフィックス長（例: 24）またはマスク（例: 255.255.255.0）'
+    Add-LabeledRow 'ゲートウェイ:' $gatewayBox '任意。例: 192.168.1.1'
+    Add-LabeledRow 'DNSサーバー:' $dnsBox '任意。カンマ区切り（例: 8.8.8.8, 1.1.1.1）'
+    Add-LabeledRow 'メモ:' $noteBox '任意'
+    [void]$layout.Controls.Add((New-Object System.Windows.Forms.Label))
+    [void]$layout.Controls.Add($errorLabel)
+
+    $updateStatic = {
+        $en = $staticRadio.Checked
+        $ipv4Box.Enabled = $en
+        $subnetBox.Enabled = $en
+        $gatewayBox.Enabled = $en
+        $dnsBox.Enabled = $en
+    }.GetNewClosure()
+    $dhcpRadio.Add_CheckedChanged($updateStatic)
+    $staticRadio.Add_CheckedChanged($updateStatic)
+
+    # load
+    $nameBox.Text = [string]$Initial.name
+    if (([string]$Initial.mode).ToLowerInvariant() -eq 'static') {
+        $staticRadio.Checked = $true
+    }
+    else {
+        $dhcpRadio.Checked = $true
+    }
+    $ipv4Box.Text = if ($Initial.ipv4) { [string]$Initial.ipv4 } else { '' }
+    if ($null -ne $Initial.prefixLength -and "$($Initial.prefixLength)" -ne '') {
+        $subnetBox.Text = [string]$Initial.prefixLength
+    }
+    elseif ($Initial.subnetMask) {
+        $subnetBox.Text = [string]$Initial.subnetMask
+    }
+    else {
+        $subnetBox.Text = ''
+    }
+    $gatewayBox.Text = if ($Initial.gateway) { [string]$Initial.gateway } else { '' }
+    $dnsBox.Text = if ($Initial.dns) { (@($Initial.dns) -join ', ') } else { '' }
+    $noteBox.Text = if ($Initial.note) { [string]$Initial.note } else { '' }
+    & $updateStatic
+
+    $btnPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+    $btnPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+    $btnPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+    $btnPanel.Padding = New-Object System.Windows.Forms.Padding(16)
+    $btnPanel.Height = 56
+    $okBtn = New-Object System.Windows.Forms.Button
+    $okBtn.Text = 'OK'
+    $okBtn.Width = 90
+    $okBtn.Height = 32
+    $cancelBtn = New-Object System.Windows.Forms.Button
+    $cancelBtn.Text = 'キャンセル'
+    $cancelBtn.Width = 90
+    $cancelBtn.Height = 32
+    $cancelBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    [void]$btnPanel.Controls.Add($cancelBtn)
+    [void]$btnPanel.Controls.Add($okBtn)
+
+    $script:EditResult = $null
+    $okBtn.Add_Click({
+        $mode = if ($staticRadio.Checked) { 'static' } else { 'dhcp' }
+        $p = [ordered]@{
+            name = $nameBox.Text.Trim()
+            mode = $mode
+        }
+        if ($mode -eq 'static') {
+            $p.ipv4 = $ipv4Box.Text.Trim()
+            $subnetInput = $subnetBox.Text.Trim()
+            if ($subnetInput -match '^\d{1,2}$' -and [int]$subnetInput -ge 0 -and [int]$subnetInput -le 32) {
+                $p.prefixLength = [int]$subnetInput
+            }
+            elseif ($subnetInput) {
+                $p.subnetMask = $subnetInput
+            }
+            if (-not [string]::IsNullOrWhiteSpace($gatewayBox.Text)) {
+                $p.gateway = $gatewayBox.Text.Trim()
+            }
+            $dnsParts = $dnsBox.Text -split '[, \t]+' | Where-Object { $_ -ne '' }
+            $p.dns = @($dnsParts)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($noteBox.Text)) {
+            $p.note = $noteBox.Text.Trim()
+        }
+        $obj = [pscustomobject]$p
+        $errs = Test-PresetValid $obj
+        if ($errs.Count -gt 0) {
+            $errorLabel.Text = ($errs -join "`r`n")
+            return
+        }
+        $script:EditResult = ConvertTo-PresetObject $obj
+        $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $dlg.Close()
+    }.GetNewClosure())
+
+    $dlg.AcceptButton = $okBtn
+    $dlg.CancelButton = $cancelBtn
+    $dlg.Controls.Add($layout)
+    $dlg.Controls.Add($btnPanel)
+
+    $null = $dlg.ShowDialog($Owner)
+    return $script:EditResult
+}
+
+# ---------------------------------------------------------------------------
+# Main form
+# ---------------------------------------------------------------------------
+$script:Presets = @()
+$script:Adapters = @()
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'IPプリセット'
+$form.ClientSize = New-Object System.Drawing.Size(780, 700)
+$form.MinimumSize = New-Object System.Drawing.Size(700, 620)
+$form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+$form.Font = Get-AppFont
+
+$root = New-Object System.Windows.Forms.TableLayoutPanel
+$root.Dock = [System.Windows.Forms.DockStyle]::Fill
+$root.ColumnCount = 1
+$root.RowCount = 4
+$root.Padding = New-Object System.Windows.Forms.Padding(12)
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+[void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 170)))
+
+# Adapter row
+$adapterRow = New-Object System.Windows.Forms.TableLayoutPanel
+$adapterRow.Dock = [System.Windows.Forms.DockStyle]::Top
+$adapterRow.AutoSize = $true
+$adapterRow.ColumnCount = 3
+$adapterRow.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+[void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+[void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+[void]$adapterRow.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+$adapterLabel = New-Object System.Windows.Forms.Label
+$adapterLabel.Text = 'ネットワークアダプター:'
+$adapterLabel.AutoSize = $true
+$adapterLabel.Margin = New-Object System.Windows.Forms.Padding(0, 8, 8, 0)
+
+$adapterCombo = New-Object System.Windows.Forms.ComboBox
+$adapterCombo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+$adapterCombo.Dock = [System.Windows.Forms.DockStyle]::Fill
+$adapterCombo.Margin = New-Object System.Windows.Forms.Padding(0, 3, 8, 0)
+
+$refreshAdapterBtn = New-Object System.Windows.Forms.Button
+$refreshAdapterBtn.Text = '更新'
+$refreshAdapterBtn.AutoSize = $true
+$refreshAdapterBtn.Margin = New-Object System.Windows.Forms.Padding(0, 3, 0, 0)
+
+[void]$adapterRow.Controls.Add($adapterLabel, 0, 0)
+[void]$adapterRow.Controls.Add($adapterCombo, 1, 0)
+[void]$adapterRow.Controls.Add($refreshAdapterBtn, 2, 0)
+
+# Current status
+$statusGroup = New-Object System.Windows.Forms.GroupBox
+$statusGroup.Text = '現在の状態'
+$statusGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$statusGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+
+$statusInner = New-Object System.Windows.Forms.TableLayoutPanel
+$statusInner.Dock = [System.Windows.Forms.DockStyle]::Fill
+$statusInner.ColumnCount = 1
+$statusInner.RowCount = 2
+$statusInner.Padding = New-Object System.Windows.Forms.Padding(8)
+[void]$statusInner.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+[void]$statusInner.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+
+$currentConfigText = New-Object System.Windows.Forms.TextBox
+$currentConfigText.Multiline = $true
+$currentConfigText.ReadOnly = $true
+$currentConfigText.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+$currentConfigText.BackColor = [System.Drawing.SystemColors]::Control
+$currentConfigText.Dock = [System.Windows.Forms.DockStyle]::Fill
+$currentConfigText.Font = New-Object System.Drawing.Font('Consolas', 9.5)
+$currentConfigText.Text = '（アダプターを選択してください）'
+
+$refreshConfigBtn = New-Object System.Windows.Forms.Button
+$refreshConfigBtn.Text = '再取得'
+$refreshConfigBtn.AutoSize = $true
+
+$configBtnRow = New-Object System.Windows.Forms.FlowLayoutPanel
+$configBtnRow.Dock = [System.Windows.Forms.DockStyle]::Fill
+$configBtnRow.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+$configBtnRow.AutoSize = $true
+[void]$configBtnRow.Controls.Add($refreshConfigBtn)
+
+[void]$statusInner.Controls.Add($currentConfigText, 0, 0)
+[void]$statusInner.Controls.Add($configBtnRow, 0, 1)
+$statusGroup.Controls.Add($statusInner)
+
+# Presets group
+$presetGroup = New-Object System.Windows.Forms.GroupBox
+$presetGroup.Text = 'プリセット'
+$presetGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$presetGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
+
+$presetLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$presetLayout.Dock = [System.Windows.Forms.DockStyle]::Fill
+$presetLayout.ColumnCount = 2
+$presetLayout.RowCount = 1
+$presetLayout.Padding = New-Object System.Windows.Forms.Padding(8)
+[void]$presetLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+[void]$presetLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 170)))
+
+$presetList = New-Object System.Windows.Forms.ListBox
+$presetList.Dock = [System.Windows.Forms.DockStyle]::Fill
+$presetList.Font = Get-AppFont -Size 10
+$presetList.IntegralHeight = $false
+$presetList.DisplayMember = 'Display'
+
+$buttonPanel = New-Object System.Windows.Forms.TableLayoutPanel
+$buttonPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
+$buttonPanel.ColumnCount = 1
+$buttonPanel.RowCount = 6
+$buttonPanel.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+for ($i = 0; $i -lt 5; $i++) {
+    [void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::AutoSize)))
+}
+[void]$buttonPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+
+$addBtn = New-Object System.Windows.Forms.Button
+$addBtn.Text = '追加(&A)'
+$editBtn = New-Object System.Windows.Forms.Button
+$editBtn.Text = '編集(&E)'
+$deleteBtn = New-Object System.Windows.Forms.Button
+$deleteBtn.Text = '削除(&D)'
+foreach ($b in @($addBtn, $editBtn, $deleteBtn)) {
+    $b.Dock = [System.Windows.Forms.DockStyle]::Top
+    $b.Height = 34
+    $b.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 8)
+}
+
+$applyBtn = New-Object System.Windows.Forms.Button
+$applyBtn.Text = '適用'
+$applyBtn.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$applyBtn.Height = 56
+$applyBtn.BackColor = $script:AccentColor
+$applyBtn.ForeColor = [System.Drawing.Color]::White
+$applyBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$applyBtn.FlatAppearance.BorderSize = 0
+$applyBtn.Font = Get-AppFont -Size 12 -Style Bold
+$applyBtn.UseVisualStyleBackColor = $false
+
+[void]$buttonPanel.Controls.Add($addBtn, 0, 0)
+[void]$buttonPanel.Controls.Add($editBtn, 0, 1)
+[void]$buttonPanel.Controls.Add($deleteBtn, 0, 2)
+[void]$buttonPanel.Controls.Add($applyBtn, 0, 5)
+[void]$presetLayout.Controls.Add($presetList, 0, 0)
+[void]$presetLayout.Controls.Add($buttonPanel, 1, 0)
+$presetGroup.Controls.Add($presetLayout)
+
+# Log
+$logGroup = New-Object System.Windows.Forms.GroupBox
+$logGroup.Text = 'ログ'
+$logGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$logText = New-Object System.Windows.Forms.TextBox
+$logText.Multiline = $true
+$logText.ReadOnly = $true
+$logText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+$logText.Dock = [System.Windows.Forms.DockStyle]::Fill
+$logText.Font = New-Object System.Drawing.Font('Consolas', 9)
+$logText.BackColor = [System.Drawing.Color]::White
+$logGroup.Controls.Add($logText)
+
+[void]$root.Controls.Add($adapterRow, 0, 0)
+[void]$root.Controls.Add($statusGroup, 0, 1)
+[void]$root.Controls.Add($presetGroup, 0, 2)
+[void]$root.Controls.Add($logGroup, 0, 3)
+$form.Controls.Add($root)
+
+function Append-Log {
+    param([string]$Message, [switch]$IsError)
+    $ts = Get-Date -Format 'HH:mm:ss'
+    $prefix = if ($IsError) { '[エラー]' } else { '[情報]' }
+    $logText.AppendText("$ts $prefix $Message`r`n")
+}
+
+function Get-SelectedAdapter {
+    if ($adapterCombo.SelectedIndex -lt 0) { return $null }
+    return $script:Adapters[$adapterCombo.SelectedIndex]
+}
+
+function Get-SelectedPreset {
+    if ($presetList.SelectedIndex -lt 0) { return $null }
+    return $script:Presets[$presetList.SelectedIndex]
+}
+
+function Update-CurrentConfig {
+    $adapter = Get-SelectedAdapter
+    try {
+        $currentConfigText.Text = Get-CurrentConfigText -Adapter $adapter
+    }
+    catch {
+        $currentConfigText.Text = '現在の状態の取得中にエラーが発生しました。'
+        Append-Log "状態取得エラー: $($_.Exception.Message)" -IsError
+    }
+}
+
+function Refresh-AdapterList {
+    param([switch]$PreserveSelection)
+    $prevName = $null
+    if ($PreserveSelection) {
+        $sel = Get-SelectedAdapter
+        if ($sel) { $prevName = $sel.Name }
+    }
+    try {
+        $script:Adapters = @(Get-AdapterList)
+    }
+    catch {
+        $script:Adapters = @()
+        Append-Log "アダプター一覧の取得に失敗しました: $($_.Exception.Message)" -IsError
+    }
+    $adapterCombo.Items.Clear()
+    foreach ($a in $script:Adapters) {
+        [void]$adapterCombo.Items.Add("$($a.Name)  [$($a.Status)]")
+    }
+    if ($script:Adapters.Count -eq 0) {
+        Append-Log 'ネットワークアダプターが見つかりませんでした。' -IsError
+        return
+    }
+    $idx = 0
+    if ($prevName) {
+        for ($i = 0; $i -lt $script:Adapters.Count; $i++) {
+            if ($script:Adapters[$i].Name -eq $prevName) { $idx = $i; break }
+        }
+    }
+    $adapterCombo.SelectedIndex = $idx
+}
+
+function Refresh-PresetList {
+    $prevName = $null
+    $sel = Get-SelectedPreset
+    if ($sel) { $prevName = [string]$sel.name }
+    $presetList.Items.Clear()
+    foreach ($p in $script:Presets) {
+        $modeTag = if (([string]$p.mode).ToLowerInvariant() -eq 'static') { '静的' } else { 'DHCP' }
+        [void]$presetList.Items.Add("$($p.name)  ·  $modeTag")
+    }
+    if ($prevName) {
+        for ($i = 0; $i -lt $script:Presets.Count; $i++) {
+            if ([string]$script:Presets[$i].name -eq $prevName) {
+                $presetList.SelectedIndex = $i
+                break
+            }
+        }
+    }
+}
+
+function Load-PresetsIntoUi {
+    try {
+        $script:Presets = @(Read-Presets)
+    }
+    catch {
+        $script:Presets = @()
+        Append-Log "presets.json の読み込みに失敗しました: $($_.Exception.Message)" -IsError
+    }
+    Refresh-PresetList
+}
+
+function Save-PresetsFromUi {
+    try {
+        Write-Presets -Presets $script:Presets
+    }
+    catch {
+        Append-Log "presets.json の保存に失敗しました: $($_.Exception.Message)" -IsError
+    }
+}
+
+function Set-Busy {
+    param([bool]$Busy)
+    $form.Cursor = if ($Busy) { [System.Windows.Forms.Cursors]::WaitCursor } else { [System.Windows.Forms.Cursors]::Default }
+    $applyBtn.Enabled = -not $Busy
+    $addBtn.Enabled = -not $Busy
+    $editBtn.Enabled = -not $Busy
+    $deleteBtn.Enabled = -not $Busy
+    $adapterCombo.Enabled = -not $Busy
+    $refreshAdapterBtn.Enabled = -not $Busy
+}
+
+$adapterCombo.Add_SelectedIndexChanged({ Update-CurrentConfig })
+$refreshAdapterBtn.Add_Click({ Refresh-AdapterList -PreserveSelection; Update-CurrentConfig })
+$refreshConfigBtn.Add_Click({ Update-CurrentConfig })
+
+$addBtn.Add_Click({
+    $initial = [pscustomobject]@{ name = '新しいプリセット'; mode = 'dhcp' }
+    $result = Show-PresetEditDialog -Owner $form -Initial $initial
+    if ($null -eq $result) { return }
+    $script:Presets += $result
+    Save-PresetsFromUi
+    Refresh-PresetList
+    Append-Log "プリセット「$($result.name)」を追加しました。"
+})
+
+$editSelected = {
+    $sel = Get-SelectedPreset
+    if (-not $sel) {
+        [System.Windows.Forms.MessageBox]::Show($form, '編集するプリセットを選択してください。', 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+    $idx = $presetList.SelectedIndex
+    $result = Show-PresetEditDialog -Owner $form -Initial $sel
+    if ($null -eq $result) { return }
+    $script:Presets[$idx] = $result
+    Save-PresetsFromUi
+    Refresh-PresetList
+    Append-Log "プリセット「$($result.name)」を更新しました。"
+}
+$editBtn.Add_Click($editSelected)
+$presetList.Add_DoubleClick($editSelected)
+
+$deleteBtn.Add_Click({
+    $sel = Get-SelectedPreset
+    if (-not $sel) {
+        [System.Windows.Forms.MessageBox]::Show($form, '削除するプリセットを選択してください。', 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        $form,
+        "プリセット「$($sel.name)」を削除しますか？`r`nこの操作は元に戻せません。",
+        '削除の確認',
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Warning,
+        [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    $idx = $presetList.SelectedIndex
+    $name = [string]$sel.name
+    $list = [System.Collections.ArrayList]@($script:Presets)
+    [void]$list.RemoveAt($idx)
+    $script:Presets = @($list)
+    Save-PresetsFromUi
+    Refresh-PresetList
+    Append-Log "プリセット「$name」を削除しました。"
+})
+
+$applyBtn.Add_Click({
+    $adapter = Get-SelectedAdapter
+    if (-not $adapter) {
+        [System.Windows.Forms.MessageBox]::Show($form, 'ネットワークアダプターを選択してください。', 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        return
+    }
+    $preset = Get-SelectedPreset
+    if (-not $preset) {
+        [System.Windows.Forms.MessageBox]::Show($form, '適用するプリセットを選択してください。', 'IPプリセット',
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        return
+    }
+    $errs = Test-PresetValid $preset
+    if ($errs.Count -gt 0) {
+        [System.Windows.Forms.MessageBox]::Show($form, ($errs -join "`r`n"), '入力エラー',
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        return
+    }
+    $modeText = if (([string]$preset.mode).ToLowerInvariant() -eq 'static') {
+        $gwText = if ($preset.gateway) { $preset.gateway } else { 'なし' }
+        "静的IP: $($preset.ipv4) / ゲートウェイ: $gwText"
+    }
+    else {
+        'DHCP（自動取得）'
+    }
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        $form,
+        "アダプター「$($adapter.Name)」にプリセット「$($preset.name)」を適用します。`r`n設定内容: $modeText`r`n`r`n適用中は一時的にネットワーク接続が切断される場合があります。よろしいですか？",
+        '適用の確認',
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Warning,
+        [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) {
+        Append-Log '適用をキャンセルしました。'
+        return
+    }
+
+    Set-Busy $true
+    Append-Log "「$($preset.name)」を適用しています…"
+    $form.Refresh()
+    try {
+        $null = Invoke-ApplyPreset -IfIndex ([int]$adapter.ifIndex) -Preset $preset
+        Append-Log "「$($preset.name)」を適用しました。"
+    }
+    catch {
+        Append-Log $_.Exception.Message -IsError
+    }
+    finally {
+        Set-Busy $false
+        Refresh-AdapterList -PreserveSelection
+        Update-CurrentConfig
+    }
+})
+
+$form.Add_Shown({
+    $elevNote = if (Test-IsElevated) { '管理者権限で起動しています。' } else { '通常権限で起動しています（適用時にUAC確認があります）。' }
+    Append-Log "起動しました。$elevNote"
+    Load-PresetsIntoUi
+    Refresh-AdapterList
+    Update-CurrentConfig
+})
+
+[System.Windows.Forms.Application]::Run($form)
