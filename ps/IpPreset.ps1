@@ -711,12 +711,12 @@ function Show-AdapterPickDialog {
     $info.Height = 56
     $info.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 8)
     $info.Font = Get-AppFont -Size 10
-    $info.Text = [string](if ($PresetName) {
-        "プリセット「$PresetName」を適用するアダプターを選んでください。"
+    if ($PresetName) {
+        $info.Text = "プリセット「$PresetName」を適用するアダプターを選んでください。"
     }
     else {
-        '適用するアダプターを選んでください。'
-    })
+        $info.Text = '適用するアダプターを選んでください。'
+    }
 
     $listHost = New-Object System.Windows.Forms.Panel
     $listHost.Dock = [System.Windows.Forms.DockStyle]::Fill
