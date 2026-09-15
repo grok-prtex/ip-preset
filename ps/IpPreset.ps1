@@ -130,7 +130,7 @@ if (-not (Test-IsElevated)) {
     }
     # UseShellExecute/Verb=RunAs では ArgumentList の空文字が欠落しやすいため、1本の引数文字列にする
     $argParts = New-Object System.Collections.Generic.List[string]
-    foreach ($a in @('-NoProfile', '-ExecutionPolicy Bypass', '-WindowStyle Hidden', '-STA', '-File', (Quote-Arg $script:ScriptPath))) {
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy Bypass', '-STA', '-File', (Quote-Arg $script:ScriptPath))) {
         [void]$argParts.Add($a)
     }
     foreach ($key in $PSBoundParameters.Keys) {
@@ -145,10 +145,17 @@ if (-not (Test-IsElevated)) {
     }
     $arguments = $argParts -join ' '
     try {
-        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
+        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
     }
     catch {
-        # UAC cancel often surfaces as Win32 exception
+        try {
+            Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+            [System.Windows.Forms.MessageBox]::Show(
+                '管理者権限の承認が必要です。UAC で許可してください。',
+                'IPプリセット',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        } catch { }
         exit 1
     }
     if ($null -eq $proc) { exit 1 }
@@ -161,7 +168,7 @@ if (-not (Test-IsElevated)) {
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
     # $args drops named parameters; rebuild from $PSBoundParameters so -Preset etc. survive
     $relaunch = New-Object System.Collections.Generic.List[string]
-    foreach ($a in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-STA', '-File', $MyInvocation.MyCommand.Path)) {
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', $MyInvocation.MyCommand.Path)) {
         [void]$relaunch.Add($a)
     }
     foreach ($key in $PSBoundParameters.Keys) {
@@ -174,7 +181,7 @@ if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
             [void]$relaunch.Add([string]$val)
         }
     }
-    Start-Process -FilePath 'powershell.exe' -ArgumentList $relaunch.ToArray() -Wait -WindowStyle Hidden
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $relaunch.ToArray() -Wait
     exit $LASTEXITCODE
 }
 
@@ -182,29 +189,6 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
-[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
-$script:UiThreadExceptionHandler = [System.Threading.ThreadExceptionEventHandler]{
-    param($sender, $e)
-    $ex = $e.Exception
-    [string]$detail = if ($null -ne $ex) { $ex.ToString() } else { [string]$e }
-    [System.Windows.Forms.MessageBox]::Show(
-        ("未処理のUI例外が発生しました。`r`n`r`n{0}" -f $detail),
-        'IPプリセット',
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
-}
-[System.Windows.Forms.Application]::add_ThreadException($script:UiThreadExceptionHandler)
-$script:UiUnhandledExceptionHandler = [System.UnhandledExceptionEventHandler]{
-    param($sender, $e)
-    $ex = $e.ExceptionObject
-    [string]$detail = if ($null -ne $ex) { $ex.ToString() } else { [string]$e }
-    [System.Windows.Forms.MessageBox]::Show(
-        ("未処理の例外が発生しました。`r`n`r`n{0}" -f $detail),
-        'IPプリセット',
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
-}
-[AppDomain]::CurrentDomain.add_UnhandledException($script:UiUnhandledExceptionHandler)
 $script:AccentColor = [System.Drawing.ColorTranslator]::FromHtml('#FF6B2C')
 $script:ErrorColor = [System.Drawing.ColorTranslator]::FromHtml('#B3261E')
 # Subtle panel tones (status / presets / log) — not flashy
