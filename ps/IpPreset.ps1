@@ -182,6 +182,29 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+$script:UiThreadExceptionHandler = [System.Threading.ThreadExceptionEventHandler]{
+    param($sender, $e)
+    $ex = $e.Exception
+    [string]$detail = if ($null -ne $ex) { $ex.ToString() } else { [string]$e }
+    [System.Windows.Forms.MessageBox]::Show(
+        ("未処理のUI例外が発生しました。`r`n`r`n{0}" -f $detail),
+        'IPプリセット',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+}
+[System.Windows.Forms.Application]::add_ThreadException($script:UiThreadExceptionHandler)
+$script:UiUnhandledExceptionHandler = [System.UnhandledExceptionEventHandler]{
+    param($sender, $e)
+    $ex = $e.ExceptionObject
+    [string]$detail = if ($null -ne $ex) { $ex.ToString() } else { [string]$e }
+    [System.Windows.Forms.MessageBox]::Show(
+        ("未処理の例外が発生しました。`r`n`r`n{0}" -f $detail),
+        'IPプリセット',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+}
+[AppDomain]::CurrentDomain.add_UnhandledException($script:UiUnhandledExceptionHandler)
 $script:AccentColor = [System.Drawing.ColorTranslator]::FromHtml('#FF6B2C')
 $script:ErrorColor = [System.Drawing.ColorTranslator]::FromHtml('#B3261E')
 # Subtle panel tones (status / presets / log) — not flashy
@@ -501,7 +524,7 @@ function Show-PresetEditDialog {
     [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 
     $nameBox = New-Object System.Windows.Forms.TextBox
-    $nameBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $nameBox.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $nameBox.ImeMode = [System.Windows.Forms.ImeMode]::Hiragana
     $dhcpRadio = New-Object System.Windows.Forms.RadioButton
     $dhcpRadio.Text = 'DHCP（自動取得）'
@@ -510,15 +533,15 @@ function Show-PresetEditDialog {
     $staticRadio.Text = '静的（手動設定）'
     $staticRadio.AutoSize = $true
     $ipv4Box = New-Object System.Windows.Forms.TextBox
-    $ipv4Box.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $ipv4Box.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $subnetBox = New-Object System.Windows.Forms.TextBox
-    $subnetBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $subnetBox.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $gatewayBox = New-Object System.Windows.Forms.TextBox
-    $gatewayBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $gatewayBox.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $dnsBox = New-Object System.Windows.Forms.TextBox
-    $dnsBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $dnsBox.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $noteBox = New-Object System.Windows.Forms.TextBox
-    $noteBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $noteBox.Anchor = [System.Windows.Forms.AnchorStyles]([System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right)
     $noteBox.ImeMode = [System.Windows.Forms.ImeMode]::Hiragana
     $errorLabel = New-Object System.Windows.Forms.Label
     $errorLabel.ForeColor = $script:ErrorColor
@@ -593,7 +616,7 @@ function Show-PresetEditDialog {
     else {
         $dhcpRadio.Checked = $true
     }
-    $ipv4Box.Text = if ($Initial.ipv4) { [string]$Initial.ipv4 } else { '' }
+    $ipv4Box.Text = [string](if ($Initial.ipv4) { [string]$Initial.ipv4 } else { '' })
     if ($null -ne $Initial.prefixLength -and "$($Initial.prefixLength)" -ne '') {
         $subnetBox.Text = [string]$Initial.prefixLength
     }
@@ -603,9 +626,9 @@ function Show-PresetEditDialog {
     else {
         $subnetBox.Text = ''
     }
-    $gatewayBox.Text = if ($Initial.gateway) { [string]$Initial.gateway } else { '' }
-    $dnsBox.Text = if ($Initial.dns) { (@($Initial.dns) -join ', ') } else { '' }
-    $noteBox.Text = if ($Initial.note) { [string]$Initial.note } else { '' }
+    $gatewayBox.Text = [string](if ($Initial.gateway) { [string]$Initial.gateway } else { '' })
+    $dnsBox.Text = [string](if ($Initial.dns) { (@($Initial.dns) -join ', ') } else { '' })
+    $noteBox.Text = [string](if ($Initial.note) { [string]$Initial.note } else { '' })
     & $updateStatic
 
     $btnPanel = New-Object System.Windows.Forms.FlowLayoutPanel
@@ -630,7 +653,7 @@ function Show-PresetEditDialog {
     # Capture a hashtable (reference type) so the OK handler can return the result.
     $editState = @{ Result = $null }
     $okBtn.Add_Click({
-        $mode = if ($staticRadio.Checked) { 'static' } else { 'dhcp' }
+        [string]$mode = if ($staticRadio.Checked) { 'static' } else { 'dhcp' }
         $p = [ordered]@{
             name = $nameBox.Text.Trim()
             mode = $mode
@@ -647,8 +670,8 @@ function Show-PresetEditDialog {
             if (-not [string]::IsNullOrWhiteSpace($gatewayBox.Text)) {
                 $p.gateway = $gatewayBox.Text.Trim()
             }
-            $dnsParts = $dnsBox.Text -split '[, \t]+' | Where-Object { $_ -ne '' }
-            $p.dns = @($dnsParts)
+            $dnsParts = @($dnsBox.Text -split '[, \t]+' | Where-Object { $_ -ne '' } | ForEach-Object { [string]$_ })
+            $p.dns = [string[]]@($dnsParts)
         }
         if (-not [string]::IsNullOrWhiteSpace($noteBox.Text)) {
             $p.note = $noteBox.Text.Trim()
@@ -704,12 +727,12 @@ function Show-AdapterPickDialog {
     $info.Height = 56
     $info.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 8)
     $info.Font = Get-AppFont -Size 10
-    $info.Text = if ($PresetName) {
+    $info.Text = [string](if ($PresetName) {
         "プリセット「$PresetName」を適用するアダプターを選んでください。"
     }
     else {
         '適用するアダプターを選んでください。'
-    }
+    })
 
     $listHost = New-Object System.Windows.Forms.Panel
     $listHost.Dock = [System.Windows.Forms.DockStyle]::Fill
@@ -742,7 +765,7 @@ function Show-AdapterPickDialog {
     $applyBtn.ForeColor = [System.Drawing.Color]::White
     $applyBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $applyBtn.FlatAppearance.BorderSize = 0
-    $applyBtn.Font = Get-AppFont -Size 10 -Style Bold
+    $applyBtn.Font = Get-AppFont -Size 10 -Style ([System.Drawing.FontStyle]::Bold)
     $applyBtn.UseVisualStyleBackColor = $false
     $cancelBtn = New-Object System.Windows.Forms.Button
     $cancelBtn.Text = 'キャンセル'
@@ -931,7 +954,7 @@ $root.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 14)
 $titleLabel = New-Object System.Windows.Forms.Label
 $titleLabel.Text = 'IPプリセット'
 $titleLabel.AutoSize = $true
-$titleLabel.Font = Get-AppFont -Size 14 -Style Bold
+$titleLabel.Font = Get-AppFont -Size 14 -Style ([System.Drawing.FontStyle]::Bold)
 $titleLabel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 2)
 $titleHint = New-Object System.Windows.Forms.Label
 $titleHint.Text = 'ネットワークアダプターの IPv4 設定をプリセットで切り替え'
@@ -983,7 +1006,7 @@ $statusGroup = New-Object System.Windows.Forms.GroupBox
 $statusGroup.Text = '現在の状態'
 $statusGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
 $statusGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
-$statusGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$statusGroup.Font = Get-AppFont -Size 9.5 -Style ([System.Drawing.FontStyle]::Bold)
 $statusGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 
 $statusInner = New-Object System.Windows.Forms.TableLayoutPanel
@@ -1028,7 +1051,7 @@ $presetGroup = New-Object System.Windows.Forms.GroupBox
 $presetGroup.Text = 'プリセット'
 $presetGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
 $presetGroup.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
-$presetGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$presetGroup.Font = Get-AppFont -Size 9.5 -Style ([System.Drawing.FontStyle]::Bold)
 $presetGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 
 $presetLayout = New-Object System.Windows.Forms.TableLayoutPanel
@@ -1089,7 +1112,7 @@ $applyBtn.BackColor = $script:AccentColor
 $applyBtn.ForeColor = [System.Drawing.Color]::White
 $applyBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $applyBtn.FlatAppearance.BorderSize = 0
-$applyBtn.Font = Get-AppFont -Size 12 -Style Bold
+$applyBtn.Font = Get-AppFont -Size 12 -Style ([System.Drawing.FontStyle]::Bold)
 $applyBtn.UseVisualStyleBackColor = $false
 $applyBtn.Margin = New-Object System.Windows.Forms.Padding(0)
 
@@ -1106,7 +1129,7 @@ $presetGroup.Controls.Add($presetLayout)
 $logGroup = New-Object System.Windows.Forms.GroupBox
 $logGroup.Text = 'ログ'
 $logGroup.Dock = [System.Windows.Forms.DockStyle]::Fill
-$logGroup.Font = Get-AppFont -Size 9.5 -Style Bold
+$logGroup.Font = Get-AppFont -Size 9.5 -Style ([System.Drawing.FontStyle]::Bold)
 $logGroup.Padding = New-Object System.Windows.Forms.Padding(10, 8, 10, 10)
 $logText = New-Object System.Windows.Forms.TextBox
 $logText.Multiline = $true
@@ -1293,7 +1316,10 @@ $deleteBtn.Add_Click({
     if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
     $idx = $presetList.SelectedIndex
     $name = [string]$sel.name
-    $list = [System.Collections.ArrayList]@($script:Presets)
+    $list = New-Object System.Collections.ArrayList
+    if ($null -ne $script:Presets) {
+        [void]$list.AddRange(@($script:Presets))
+    }
     [void]$list.RemoveAt($idx)
     $script:Presets = @($list)
     Save-PresetsFromUi
@@ -1320,8 +1346,8 @@ $applyBtn.Add_Click({
             [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
         return
     }
-    $modeText = if (([string]$preset.mode).ToLowerInvariant() -eq 'static') {
-        $gwText = if ($preset.gateway) { $preset.gateway } else { 'なし' }
+    [string]$modeText = if (([string]$preset.mode).ToLowerInvariant() -eq 'static') {
+        [string]$gwText = if ($preset.gateway) { [string]$preset.gateway } else { 'なし' }
         "静的IP: $($preset.ipv4) / ゲートウェイ: $gwText"
     }
     else {
@@ -1357,7 +1383,7 @@ $applyBtn.Add_Click({
 })
 
 $form.Add_Shown({
-    $elevNote = if (Test-IsElevated) { '管理者権限で起動しています。' } else { '管理者権限が必要です（起動時にUAC確認があります）。' }
+    [string]$elevNote = if (Test-IsElevated) { '管理者権限で起動しています。' } else { '管理者権限が必要です（起動時にUAC確認があります）。' }
     Append-Log "起動しました。$elevNote"
     Load-PresetsIntoUi
     Refresh-AdapterList
