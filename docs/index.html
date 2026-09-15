@@ -12,7 +12,7 @@
   <main>
     <header>
       <p class="mark">ぐろっく</p>
-      <p class="ver">v0.2.0</p>
+      <p class="ver" id="ver-label">最新版</p>
     </header>
 
     <h1>拠点の IP を、<br>プリセットで切り替える</h1>
@@ -22,7 +22,7 @@
     </p>
 
     <p class="cta">
-      <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.2.0/IpPreset-win.zip">Windows 用をダウンロード</a>
+      <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/latest/download/IpPreset-win.zip">Windows 用をダウンロード</a>
       <a class="textlink" href="https://github.com/grok-prtex/ip-preset">ソースを見る</a>
     </p>
     <p class="cta-note">軽量 zip（PowerShell）· インストール不要 · SmartScreen回避 · Windows 10 / 11</p>
@@ -79,8 +79,8 @@
       <ol>
         <li>zip を展開する（好きなフォルダで大丈夫です）</li>
         <li>（推奨）<code>setup.cmd</code> でブロック解除とショートカット作成</li>
-        <li><code>IpPreset.cmd</code> を実行する（起動時 UAC なし）</li>
-        <li>プリセットを追加し、アダプタを選んで「適用」（適用時のみ UAC）</li>
+        <li><code>IpPreset.cmd</code> を実行する（起動時に管理者 UAC）</li>
+        <li>プリセットを追加し、アダプタを選んで「適用」</li>
       </ol>
       <p class="note">ダウンロードでスクリプトがブロックされたときも <code>setup.cmd</code> で解除できます。</p>
     </section>
@@ -116,14 +116,28 @@
       <h2>ダウンロード</h2>
       <p class="lead tight">現場用の設定切り替えを、手作業から外したい人向けです。</p>
       <p class="cta">
-        <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/download/v0.2.0/IpPreset-win.zip">Windows 用をダウンロード</a>
-        <a class="textlink" href="https://github.com/grok-prtex/ip-preset/releases/tag/v0.2.0">Release ノート</a>
+        <a class="button" href="https://github.com/grok-prtex/ip-preset/releases/latest/download/IpPreset-win.zip">Windows 用をダウンロード</a>
+        <a class="textlink" href="https://github.com/grok-prtex/ip-preset/releases/latest">Release ノート</a>
       </p>
     </section>
   </main>
 
   <footer>
-    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · v0.2.0</p>
+    <p>Grok Prtex · <a href="https://github.com/grok-prtex/ip-preset">grok-prtex/ip-preset</a> · <span id="ver-footer">最新版</span></p>
   </footer>
+
+  <script>
+  (function () {
+    var api = 'https://api.github.com/repos/grok-prtex/ip-preset/releases/latest';
+    fetch(api).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+      if (!data || !data.tag_name) return;
+      var tag = data.tag_name;
+      var el = document.getElementById('ver-label');
+      var foot = document.getElementById('ver-footer');
+      if (el) el.textContent = tag;
+      if (foot) foot.textContent = tag;
+    }).catch(function () {});
+  })();
+  </script>
 </body>
 </html>
