@@ -130,7 +130,7 @@ if (-not (Test-IsElevated)) {
     }
     # UseShellExecute/Verb=RunAs では ArgumentList の空文字が欠落しやすいため、1本の引数文字列にする
     $argParts = New-Object System.Collections.Generic.List[string]
-    foreach ($a in @('-NoProfile', '-ExecutionPolicy Bypass', '-STA', '-File', (Quote-Arg $script:ScriptPath))) {
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy Bypass', '-WindowStyle Hidden', '-STA', '-File', (Quote-Arg $script:ScriptPath))) {
         [void]$argParts.Add($a)
     }
     foreach ($key in $PSBoundParameters.Keys) {
@@ -145,7 +145,7 @@ if (-not (Test-IsElevated)) {
     }
     $arguments = $argParts -join ' '
     try {
-        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru
+        $proc = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
     }
     catch {
         # UAC cancel often surfaces as Win32 exception
@@ -161,7 +161,7 @@ if (-not (Test-IsElevated)) {
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
     # $args drops named parameters; rebuild from $PSBoundParameters so -Preset etc. survive
     $relaunch = New-Object System.Collections.Generic.List[string]
-    foreach ($a in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', $MyInvocation.MyCommand.Path)) {
+    foreach ($a in @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-STA', '-File', $MyInvocation.MyCommand.Path)) {
         [void]$relaunch.Add($a)
     }
     foreach ($key in $PSBoundParameters.Keys) {
@@ -174,7 +174,7 @@ if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
             [void]$relaunch.Add([string]$val)
         }
     }
-    Start-Process -FilePath 'powershell.exe' -ArgumentList $relaunch.ToArray() -Wait
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $relaunch.ToArray() -Wait -WindowStyle Hidden
     exit $LASTEXITCODE
 }
 
@@ -626,7 +626,9 @@ function Show-PresetEditDialog {
     [void]$btnPanel.Controls.Add($cancelBtn)
     [void]$btnPanel.Controls.Add($okBtn)
 
-    $script:EditResult = $null
+    # GetNewClosure() creates a dynamic module; $script: vars there are invisible outside.
+    # Capture a hashtable (reference type) so the OK handler can return the result.
+    $editState = @{ Result = $null }
     $okBtn.Add_Click({
         $mode = if ($staticRadio.Checked) { 'static' } else { 'dhcp' }
         $p = [ordered]@{
@@ -657,7 +659,7 @@ function Show-PresetEditDialog {
             $errorLabel.Text = ($errs -join "`r`n")
             return
         }
-        $script:EditResult = ConvertTo-PresetObject $obj
+        $editState.Result = ConvertTo-PresetObject $obj
         $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $dlg.Close()
     }.GetNewClosure())
@@ -675,7 +677,7 @@ function Show-PresetEditDialog {
 
     $dr = $dlg.ShowDialog($Owner)
     if ($dr -eq [System.Windows.Forms.DialogResult]::OK) {
-        return $script:EditResult
+        return $editState.Result
     }
     return $null
 }
@@ -750,17 +752,18 @@ function Show-AdapterPickDialog {
     [void]$btnPanel.Controls.Add($cancelBtn)
     [void]$btnPanel.Controls.Add($applyBtn)
 
-    $script:AdapterPickResult = $null
+    # GetNewClosure() dynamic-module workaround: return via hashtable
+    $pickState = @{ Result = $null }
     $applyBtn.Add_Click({
         if ($list.SelectedIndex -lt 0) { return }
-        $script:AdapterPickResult = $Adapters[$list.SelectedIndex]
+        $pickState.Result = $Adapters[$list.SelectedIndex]
         $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $dlg.Close()
     }.GetNewClosure())
 
     $list.Add_DoubleClick({
         if ($list.SelectedIndex -lt 0) { return }
-        $script:AdapterPickResult = $Adapters[$list.SelectedIndex]
+        $pickState.Result = $Adapters[$list.SelectedIndex]
         $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $dlg.Close()
     }.GetNewClosure())
@@ -774,7 +777,7 @@ function Show-AdapterPickDialog {
 
     $null = $dlg.ShowDialog()
     if ($dlg.DialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
-        return $script:AdapterPickResult
+        return $pickState.Result
     }
     return $null
 }

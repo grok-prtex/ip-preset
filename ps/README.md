@@ -7,9 +7,9 @@ Windows のネットワークアダプター IPv4 設定を、名前付きプリ
 1. このフォルダを任意の場所に置きます（USB でも可）。
 2. **初回のみ推奨:** `setup.cmd` をダブルクリック  
    → ダウンロードブロック解除 + デスクトップショートカット作成
-3. `IpPreset.cmd`（またはショートカット）をダブルクリックして起動します。
+3. **`IpPreset.cmd`**（またはショートカット）をダブルクリックして起動します（**コンソール窓は出ません**）。
 
-`IpPreset.cmd` は `ExecutionPolicy Bypass` と `Unblock-File` を行い、`IpPreset.ps1` を STA で起動します（起動時に管理者昇格）。
+`IpPreset.cmd` は `Unblock-File` のあと `IpPreset-launch.vbs` 経由で `powershell -WindowStyle Hidden -STA` を起動します（黒い PowerShell 窓なし）。起動時に管理者昇格（UAC）があります。
 
 ## SmartScreen について
 

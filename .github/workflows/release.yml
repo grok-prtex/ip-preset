@@ -38,6 +38,7 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item -Path ps/IpPreset.ps1 -Destination dist/IpPreset.ps1 -Force
           Copy-Item -Path ps/IpPreset.cmd -Destination dist/IpPreset.cmd -Force
+          Copy-Item -Path ps/IpPreset-launch.vbs -Destination dist/IpPreset-launch.vbs -Force
           Copy-Item -Path ps/setup.cmd -Destination dist/setup.cmd -Force
           Copy-Item -Path ps/presets.example.json -Destination dist/presets.example.json -Force
           Copy-Item -Path ps/README.md -Destination dist/README.md -Force
@@ -78,7 +79,7 @@ jobs:
             ## 配布物
 
             - **`IpPreset-win.zip`** — PowerShell GUI（推奨・SmartScreen回避）
-              - `IpPreset.cmd` をダブルクリックして起動
+              - `IpPreset.cmd` をダブルクリックして起動（コンソール非表示）
               - 初回は `setup.cmd` 推奨（Unblock + デスクトップショートカット）
               - 適用時のみ UAC 確認があります（起動時は管理者不要）
 

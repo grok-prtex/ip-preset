@@ -7,7 +7,7 @@
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) により、`v*` タグの push または workflow_dispatch で次を行います。
 
-1. `ps/` 配下（`IpPreset.ps1` / `IpPreset.cmd` / `setup.cmd` / `presets.example.json` / `README.md`）を `IpPreset-win.zip` にまとめる
+1. `ps/` 配下（`IpPreset.ps1` / `IpPreset.cmd` / `IpPreset-launch.vbs` / `setup.cmd` / `presets.example.json` / `README.md`）を `IpPreset-win.zip` にまとめる
 2. タグ実行時は GitHub Releases のアセットとしてアップロード
 
 **入手手順:**
@@ -41,11 +41,12 @@ Compress-Archive -Path dist\* -DestinationPath IpPreset-win.zip -Force
 中身のイメージ:
 
 ```
-IpPreset.cmd           … ダブルクリック用ランチャー（Bypass + Unblock + STA）
-IpPreset.ps1           … WinForms GUI
-setup.cmd              … Unblock 全ファイル + デスクトップショートカット
-presets.example.json   … サンプル
-README.md              … 短い使い方
+IpPreset.cmd             … ダブルクリック用ランチャー（Unblock → VBS）
+IpPreset-launch.vbs      … コンソール非表示で powershell を起動
+IpPreset.ps1             … WinForms GUI
+setup.cmd                … Unblock 全ファイル + デスクトップショートカット
+presets.example.json     … サンプル
+README.md                … 短い使い方
 ```
 
 ## 2. 受け取った側（現場PC）でのセットアップ
