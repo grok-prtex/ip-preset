@@ -501,7 +501,8 @@ function Show-PresetEditDialog {
     [void]$layout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 
     $nameBox = New-Object System.Windows.Forms.TextBox
-    $nameBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $nameBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $nameBox.ImeMode = [System.Windows.Forms.ImeMode]::Hiragana
     $dhcpRadio = New-Object System.Windows.Forms.RadioButton
     $dhcpRadio.Text = 'DHCP（自動取得）'
     $dhcpRadio.AutoSize = $true
@@ -509,15 +510,16 @@ function Show-PresetEditDialog {
     $staticRadio.Text = '静的（手動設定）'
     $staticRadio.AutoSize = $true
     $ipv4Box = New-Object System.Windows.Forms.TextBox
-    $ipv4Box.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $ipv4Box.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
     $subnetBox = New-Object System.Windows.Forms.TextBox
-    $subnetBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $subnetBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
     $gatewayBox = New-Object System.Windows.Forms.TextBox
-    $gatewayBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gatewayBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
     $dnsBox = New-Object System.Windows.Forms.TextBox
-    $dnsBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $dnsBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
     $noteBox = New-Object System.Windows.Forms.TextBox
-    $noteBox.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $noteBox.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $noteBox.ImeMode = [System.Windows.Forms.ImeMode]::Hiragana
     $errorLabel = New-Object System.Windows.Forms.Label
     $errorLabel.ForeColor = $script:ErrorColor
     $errorLabel.AutoSize = $true
@@ -533,7 +535,7 @@ function Show-PresetEditDialog {
         $lbl.Margin = New-Object System.Windows.Forms.Padding(0, 10, 10, 0)
         [void]$layout.Controls.Add($lbl)
         $control.Margin = New-Object System.Windows.Forms.Padding(0, 6, 0, 2)
-        $control.Height = 26
+        $control.Height = 28
         [void]$layout.Controls.Add($control)
         if ($hint) {
             $hintLbl = New-Object System.Windows.Forms.Label
@@ -660,11 +662,16 @@ function Show-PresetEditDialog {
         $dlg.Close()
     }.GetNewClosure())
 
-    $dlg.AcceptButton = $okBtn
+    # AcceptButton は付けない（日本語IMEの確定EnterがOKに吸われて名前入力できなくなる）
     $dlg.CancelButton = $cancelBtn
     # Dock Bottom first, then Fill — Fill added first would cover the buttons
     $dlg.Controls.Add($btnPanel)
     $dlg.Controls.Add($layout)
+
+    $dlg.Add_Shown({
+        $nameBox.Focus()
+        $nameBox.SelectAll()
+    }.GetNewClosure())
 
     $dr = $dlg.ShowDialog($Owner)
     if ($dr -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -1250,9 +1257,17 @@ $editSelected = {
     $idx = $presetList.SelectedIndex
     $result = Show-PresetEditDialog -Owner $form -Initial $sel
     if ($null -eq $result) { return }
-    $script:Presets[$idx] = $result
+    # 固定長 Object[] の要素差し替えが効かない環境向けに配列を作り直す
+    $next = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $script:Presets.Count; $i++) {
+        if ($i -eq $idx) { [void]$next.Add($result) } else { [void]$next.Add($script:Presets[$i]) }
+    }
+    $script:Presets = @($next)
     Save-PresetsFromUi
     Refresh-PresetList
+    if ($idx -ge 0 -and $idx -lt $presetList.Items.Count) {
+        $presetList.SelectedIndex = $idx
+    }
     Append-Log "プリセット「$($result.name)」を更新しました。"
 }
 $editBtn.Add_Click($editSelected)
